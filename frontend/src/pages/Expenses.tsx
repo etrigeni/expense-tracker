@@ -109,7 +109,6 @@ const Expenses: React.FC = () => {
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [newExpense, setNewExpense] = useState<ExpenseFormState>(defaultExpenseForm);
   const [editExpense, setEditExpense] = useState<ExpenseFormState>(defaultExpenseForm);
-  const [isLoading, setIsLoading] = useState(true);
   const [monthFilter, setMonthFilter] = useState(getCurrentMonth());
   const [expandedBudgetCategories, setExpandedBudgetCategories] = useState<Set<string>>(new Set());
   const budgetMonth = monthFilter || getCurrentMonth();
@@ -149,13 +148,10 @@ const Expenses: React.FC = () => {
 
   const loadExpenses = async () => {
     try {
-      setIsLoading(true);
       const data = await expenseService.getExpenses();
       setExpenses(data);
     } catch (error) {
       toast.error('Failed to load expenses.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
