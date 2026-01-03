@@ -6,7 +6,8 @@
       "Bash(uv run uvicorn:*)",
       "Bash(npm install)",
       "Bash(dir:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "Bash(git add:*)"
     ]
   }
 }

@@ -223,7 +223,7 @@ const Dashboard: React.FC = () => {
     }
 
     const categories = Array.from(new Set(entries.map((item) => item.category))).sort();
-    const byMonth = new Map<string, Record<string, number>>();
+    const byMonth = new Map<string, Record<string, string | number>>();
 
     entries.forEach((item) => {
       const monthKey = item.month.slice(0, 7);

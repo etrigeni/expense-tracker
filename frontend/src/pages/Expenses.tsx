@@ -29,20 +29,6 @@ import { incomeService } from '@/services/incomeService';
 import { budgetService } from '@/services/budgetService';
 import type { Category, CategoryBudget, Expense, ExpenseCreate, ExpenseUpdate } from '@/types';
 
-const listContainer = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-    },
-  },
-};
-
-const listItem = {
-  hidden: { opacity: 0, x: -16 },
-  show: { opacity: 1, x: 0 },
-};
 
 const categoryIconMap: Record<string, LucideIcon> = {
   Bills: Receipt,
@@ -123,7 +109,6 @@ const Expenses: React.FC = () => {
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [newExpense, setNewExpense] = useState<ExpenseFormState>(defaultExpenseForm);
   const [editExpense, setEditExpense] = useState<ExpenseFormState>(defaultExpenseForm);
-  const [isLoading, setIsLoading] = useState(true);
   const [monthFilter, setMonthFilter] = useState(getCurrentMonth());
   const [expandedBudgetCategories, setExpandedBudgetCategories] = useState<Set<string>>(new Set());
   const budgetMonth = monthFilter || getCurrentMonth();
@@ -305,12 +290,7 @@ const Expenses: React.FC = () => {
     });
   };
 
-  const activeMonthLabel = formatMonthLabel(monthFilter);
   const budgetMonthLabel = formatMonthLabel(budgetMonth);
-  const emptyMessage =
-    expenses.length === 0
-      ? 'No expenses yet. Add one to get started.'
-      : `No expenses for ${activeMonthLabel}. Add one to get started.`;
 
   const handleSubmit = async (event: React.SyntheticEvent) => {
     event.preventDefault();
@@ -390,7 +370,6 @@ const Expenses: React.FC = () => {
     }
   };
 
-  const getCategoryMeta = (name: string) => categories.find((category) => category.name === name);
   const getCategoryIcon = (name: string) => categoryIconMap[name] ?? Receipt;
   const getIconTone = (name: string) => {
     const total = Array.from(name).reduce((sum, char) => sum + char.charCodeAt(0), 0);
