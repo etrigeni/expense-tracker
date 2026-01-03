@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f2f0;
+  color: #5a3a36;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.card-surface {
+  @apply rounded-2xl border border-gray-200 bg-gradient-to-br from-purple-600/10 to-blue-600/10 shadow-lg dark:border-gray-700;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e8d5d0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #be8f84;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ab776d;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: #5a3a36;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #916057;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #be8f84;
+}
