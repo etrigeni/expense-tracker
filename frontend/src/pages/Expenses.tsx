@@ -437,17 +437,17 @@ const Expenses: React.FC = () => {
       </div>
 
       <div className="grid gap-4">
-        <div className="card-surface p-5">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="card-surface p-6 lg:p-8">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Category budgets</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Set monthly limits and track spending</p>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Category Budgets</h2>
+              <p className="mt-1 text-base text-gray-600 dark:text-gray-400">Set monthly limits and track spending</p>
               {showBudgetMonthHint ? (
-                <p className="mt-1 text-xs text-gray-400">Budgets use the current month unless you pick one above.</p>
+                <p className="mt-1.5 text-sm text-purple-600 dark:text-purple-400">💡 Budgets use the current month unless you pick one above.</p>
               ) : null}
             </div>
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              {budgetMonthLabel}
+            <span className="inline-flex items-center rounded-full bg-gradient-to-r from-purple-100 to-blue-100 px-4 py-2 text-sm font-bold text-purple-700 dark:from-purple-900/30 dark:to-blue-900/30 dark:text-purple-300">
+              📅 {budgetMonthLabel}
             </span>
           </div>
           <div className="mt-4">
@@ -457,7 +457,7 @@ const Expenses: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className="space-y-3 lg:hidden">
+                <div className="space-y-4 lg:hidden">
                   {[...budgetCategories]
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((category) => {
@@ -473,13 +473,14 @@ const Expenses: React.FC = () => {
                       const budget = budgetsByCategoryId[category.id] ?? null;
                       const isOverBudget = budget !== null && budget > 0 && spent > budget;
                       const remaining = budget ? budget - spent : null;
+                      const percentage = budget && budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
                       const draftValue = budgetDrafts[category.id] ?? '';
                       const isDirty = draftValue !== (budget != null ? budget.toString() : '');
                       const isExpanded = expandedBudgetCategories.has(category.name);
                       const categoryExpenses = filteredExpenses.filter((expense) => expense.category === category.name);
 
                       return (
-                        <div key={category.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
+                        <div key={category.id} className="rounded-2xl border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50/50 p-5 shadow-lg dark:border-gray-700 dark:from-gray-900/60 dark:to-gray-900/40">
                           <button
                             type="button"
                             onClick={() =>
@@ -496,53 +497,81 @@ const Expenses: React.FC = () => {
                             className="flex w-full items-center justify-between text-left"
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${bgClass} ${colorClass}`} style={style}>
-                                <Icon className="h-4 w-4" />
+                              <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${bgClass} ${colorClass} shadow-md`} style={style}>
+                                <Icon className="h-6 w-6" />
                               </div>
                               <div>
-                                <p className="text-sm font-semibold text-gray-900 dark:text-white">{category.name}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  Spent {formatCurrency(spent)} ? {budget ? `Budget ${formatCurrency(budget)}` : 'No budget'}
+                                <p className="text-base font-bold text-gray-900 dark:text-white">{category.name}</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  {budget ? `${formatCurrency(budget)} budget` : 'No budget set'}
                                 </p>
                               </div>
                             </div>
-                            <span className="text-xs font-semibold text-gray-400">{isExpanded ? 'Hide' : 'Show'}</span>
+                            <span className="text-xs font-bold text-purple-600 dark:text-purple-400">{isExpanded ? '▲ Hide' : '▼ Show'}</span>
                           </button>
 
-                          <div className="mt-3">
-                            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                              <span>Remaining</span>
-                              <span className={isOverBudget ? 'text-red-500' : 'text-emerald-600'}>
-                                {budget ? formatCurrency(remaining ?? 0) : '?'}
-                              </span>
+                          {budget ? (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Progress</span>
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">{Math.round(percentage)}%</span>
+                              </div>
+                              <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isOverBudget
+                                      ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                      : percentage > 80
+                                      ? 'bg-gradient-to-r from-yellow-400 to-orange-500'
+                                      : 'bg-gradient-to-r from-emerald-400 to-green-500'
+                                  }`}
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
                             </div>
-                            <form
-                              className="mt-3 flex items-center gap-2"
-                              onSubmit={(event) => {
-                                event.preventDefault();
-                                handleSaveBudget(category);
-                              }}
-                            >
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                placeholder="0.00"
-                                value={draftValue}
-                                onChange={(event) =>
-                                  setBudgetDrafts((prev) => ({ ...prev, [category.id]: event.target.value }))
-                                }
-                                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-2 text-xs text-gray-900 outline-none focus:border-purple-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                              />
-                              <button
-                                type="submit"
-                                disabled={!isDirty || savingBudgetId === category.id}
-                                className="rounded-lg bg-gray-900 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600"
-                              >
-                                {savingBudgetId === category.id ? 'Saving' : 'Save'}
-                              </button>
-                            </form>
+                          ) : null}
+
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <div className="rounded-xl bg-blue-50 p-3 dark:bg-blue-900/20">
+                              <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Spent</p>
+                              <p className="mt-1 text-lg font-bold text-blue-900 dark:text-blue-300">{formatCurrency(spent)}</p>
+                            </div>
+                            <div className={`rounded-xl p-3 ${isOverBudget ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}>
+                              <p className={`text-xs font-medium ${isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {isOverBudget ? 'Over by' : 'Remaining'}
+                              </p>
+                              <p className={`mt-1 text-lg font-bold ${isOverBudget ? 'text-red-900 dark:text-red-300' : 'text-emerald-900 dark:text-emerald-300'}`}>
+                                {budget ? formatCurrency(Math.abs(remaining ?? 0)) : '—'}
+                              </p>
+                            </div>
                           </div>
+
+                          <form
+                            className="mt-4 flex items-center gap-2"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              handleSaveBudget(category);
+                            }}
+                          >
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="Set budget..."
+                              value={draftValue}
+                              onChange={(event) =>
+                                setBudgetDrafts((prev) => ({ ...prev, [category.id]: event.target.value }))
+                              }
+                              className="flex-1 rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:ring-purple-900/30"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!isDirty || savingBudgetId === category.id}
+                              className="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {savingBudgetId === category.id ? '⏳' : '💾 Save'}
+                            </button>
+                          </form>
 
                           {isExpanded ? (
                             <div className="mt-3 rounded-xl border border-gray-200 bg-white/60 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
@@ -578,17 +607,18 @@ const Expenses: React.FC = () => {
                 </div>
 
                 <div className="hidden lg:block overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full">
                     <thead>
-                      <tr className="text-left text-xs uppercase tracking-wide text-gray-400">
-                        <th className="pb-3">Category</th>
-                        <th className="pb-3">Budget</th>
-                        <th className="pb-3">Spent</th>
-                        <th className="pb-3">Remaining</th>
-                        <th className="pb-3">Status</th>
+                      <tr className="text-left text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        <th className="pb-4">Category</th>
+                        <th className="pb-4">Budget</th>
+                        <th className="pb-4">Spent</th>
+                        <th className="pb-4">Progress</th>
+                        <th className="pb-4">Remaining</th>
+                        <th className="pb-4">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="text-gray-700 dark:text-gray-200">
+                    <tbody className="text-base text-gray-700 dark:text-gray-200">
                       {[...budgetCategories]
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map((category) => {
@@ -604,6 +634,7 @@ const Expenses: React.FC = () => {
                           const budget = budgetsByCategoryId[category.id] ?? null;
                           const isOverBudget = budget !== null && budget > 0 && spent > budget;
                           const remaining = budget ? budget - spent : null;
+                          const percentage = budget && budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
                           const draftValue = budgetDrafts[category.id] ?? '';
                           const isDirty = draftValue !== (budget != null ? budget.toString() : '');
                           const isExpanded = expandedBudgetCategories.has(category.name);
@@ -612,11 +643,11 @@ const Expenses: React.FC = () => {
                           return (
                             <React.Fragment key={category.id}>
                               <tr
-                                className={`border-t border-gray-200/60 transition hover:bg-gray-50/60 dark:border-gray-700/60 dark:hover:bg-gray-900/40 ${
-                                  isExpanded ? 'bg-gray-50/80 dark:bg-gray-900/60' : ''
+                                className={`border-t-2 border-gray-200/80 transition hover:bg-gradient-to-r hover:from-purple-50/30 hover:to-blue-50/30 dark:border-gray-700/80 dark:hover:from-purple-900/10 dark:hover:to-blue-900/10 ${
+                                  isExpanded ? 'bg-purple-50/20 dark:bg-purple-900/10' : ''
                                 }`}
                               >
-                                <td className="py-3">
+                                <td className="py-5">
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -630,15 +661,15 @@ const Expenses: React.FC = () => {
                                         return next;
                                       })
                                     }
-                                    className="flex items-center gap-2 text-left"
+                                    className="flex items-center gap-3 text-left"
                                   >
-                                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${bgClass} ${colorClass}`} style={style}>
-                                      <Icon className="h-4 w-4" />
+                                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${bgClass} ${colorClass} shadow-md`} style={style}>
+                                      <Icon className="h-5 w-5" />
                                     </div>
-                                    <span className="font-medium">{category.name}</span>
+                                    <span className="text-base font-bold">{category.name}</span>
                                   </button>
                                 </td>
-                                <td className="py-3">
+                                <td className="py-5">
                                   <form
                                     className="flex items-center gap-2"
                                     onSubmit={(event) => {
@@ -650,37 +681,68 @@ const Expenses: React.FC = () => {
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      placeholder="0.00"
+                                      placeholder="Set budget..."
                                       value={draftValue}
                                       onChange={(event) =>
                                         setBudgetDrafts((prev) => ({ ...prev, [category.id]: event.target.value }))
                                       }
-                                      className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900 outline-none focus:border-purple-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                      className="w-32 rounded-xl border-2 border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:ring-purple-900/30"
                                     />
                                     <button
                                       type="submit"
                                       disabled={!isDirty || savingBudgetId === category.id}
-                                      className="rounded-lg bg-gray-900 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600"
+                                      className="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-3 py-2 text-xs font-bold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                      {savingBudgetId === category.id ? 'Saving' : 'Save'}
+                                      {savingBudgetId === category.id ? '⏳' : '💾'}
                                     </button>
                                   </form>
                                 </td>
-                                <td className="py-3">{formatCurrency(spent)}</td>
-                                <td className={`py-3 ${isOverBudget ? 'text-red-500' : 'text-emerald-600'}`}>
-                                  {budget ? formatCurrency(remaining ?? 0) : '?'}
+                                <td className="py-5">
+                                  <span className="text-base font-bold text-blue-600 dark:text-blue-400">{formatCurrency(spent)}</span>
                                 </td>
-                                <td className="py-3 text-xs text-gray-500 dark:text-gray-400">
-                                  {budget
-                                    ? isOverBudget
-                                      ? 'Over'
-                                      : 'On track'
-                                    : 'No budget'}
+                                <td className="py-5">
+                                  {budget ? (
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-2.5 w-24 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                        <div
+                                          className={`h-full rounded-full transition-all duration-500 ${
+                                            isOverBudget
+                                              ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                              : percentage > 80
+                                              ? 'bg-gradient-to-r from-yellow-400 to-orange-500'
+                                              : 'bg-gradient-to-r from-emerald-400 to-green-500'
+                                          }`}
+                                          style={{ width: `${percentage}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{Math.round(percentage)}%</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className={`py-5 text-base font-bold ${isOverBudget ? 'text-red-500' : 'text-emerald-600'}`}>
+                                  {budget ? formatCurrency(Math.abs(remaining ?? 0)) : '—'}
+                                </td>
+                                <td className="py-5">
+                                  {budget ? (
+                                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                                      isOverBudget
+                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                    }`}>
+                                      {isOverBudget ? '⚠️ Over' : '✓ On track'}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                      Not set
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                               {isExpanded ? (
                                 <tr className="bg-white dark:bg-gray-800">
-                                  <td colSpan={5} className="pb-4 pt-2">
+                                  <td colSpan={6} className="pb-4 pt-2">
                                     {categoryExpenses.length === 0 ? (
                                       <div className="rounded-xl border border-dashed border-gray-200 bg-white/60 p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
                                         No expenses for {category.name} in {activeMonthLabel}.
