@@ -97,6 +97,8 @@ const getTodayDate = () => new Date().toISOString().split('T')[0];
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 const toMonthDate = (month: string) => (month.length === 7 ? `${month}-01` : month);
 
+type BudgetSortOption = 'name' | 'spent' | 'budget' | 'remaining';
+
 const Expenses: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -111,6 +113,7 @@ const Expenses: React.FC = () => {
   const [editExpense, setEditExpense] = useState<ExpenseFormState>(defaultExpenseForm);
   const [monthFilter, setMonthFilter] = useState(getCurrentMonth());
   const [expandedBudgetCategories, setExpandedBudgetCategories] = useState<Set<string>>(new Set());
+  const [budgetSortBy, setBudgetSortBy] = useState<BudgetSortOption>('name');
   const budgetMonth = monthFilter || getCurrentMonth();
   const showBudgetMonthHint = !monthFilter;
 
@@ -145,6 +148,39 @@ const Expenses: React.FC = () => {
     () => categories.filter((category) => category.name !== 'Savings'),
     [categories]
   );
+
+  const sortedBudgetCategories = useMemo(() => {
+    const sorted = [...budgetCategories];
+
+    sorted.sort((a, b) => {
+      const spentA = budgetCategoryTotals[a.name] ?? 0;
+      const spentB = budgetCategoryTotals[b.name] ?? 0;
+      const budgetA = budgetsByCategoryId[a.id] ?? null;
+      const budgetB = budgetsByCategoryId[b.id] ?? null;
+      const remainingA = budgetA ? budgetA - spentA : 0;
+      const remainingB = budgetB ? budgetB - spentB : 0;
+
+      switch (budgetSortBy) {
+        case 'spent':
+          return spentB - spentA; // Highest spent first
+        case 'budget':
+          if (budgetA === null && budgetB === null) return 0;
+          if (budgetA === null) return 1;
+          if (budgetB === null) return -1;
+          return budgetB - budgetA; // Highest budget first
+        case 'remaining':
+          if (budgetA === null && budgetB === null) return 0;
+          if (budgetA === null) return 1;
+          if (budgetB === null) return -1;
+          return remainingB - remainingA; // Highest remaining first
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+
+    return sorted;
+  }, [budgetCategories, budgetCategoryTotals, budgetsByCategoryId, budgetSortBy]);
 
   const loadExpenses = async () => {
     try {
@@ -438,17 +474,43 @@ const Expenses: React.FC = () => {
 
       <div className="grid gap-4">
         <div className="card-surface p-6 lg:p-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Category Budgets</h2>
-              <p className="mt-1 text-base text-gray-600 dark:text-gray-400">Set monthly limits and track spending</p>
-              {showBudgetMonthHint ? (
-                <p className="mt-1.5 text-sm text-purple-600 dark:text-purple-400">💡 Budgets use the current month unless you pick one above.</p>
-              ) : null}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Category Budgets</h2>
+                <p className="mt-1 text-base text-gray-600 dark:text-gray-400">Set monthly limits and track spending</p>
+                {showBudgetMonthHint ? (
+                  <p className="mt-1.5 text-sm text-purple-600 dark:text-purple-400">💡 Budgets use the current month unless you pick one above.</p>
+                ) : null}
+              </div>
+              <span className="inline-flex items-center rounded-full bg-gradient-to-r from-purple-100 to-blue-100 px-4 py-2 text-sm font-bold text-purple-700 dark:from-purple-900/30 dark:to-blue-900/30 dark:text-purple-300">
+                📅 {budgetMonthLabel}
+              </span>
             </div>
-            <span className="inline-flex items-center rounded-full bg-gradient-to-r from-purple-100 to-blue-100 px-4 py-2 text-sm font-bold text-purple-700 dark:from-purple-900/30 dark:to-blue-900/30 dark:text-purple-300">
-              📅 {budgetMonthLabel}
-            </span>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Sort by:</span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'name' as BudgetSortOption, label: 'Name', icon: '🔤' },
+                  { value: 'spent' as BudgetSortOption, label: 'Spent', icon: '💰' },
+                  { value: 'budget' as BudgetSortOption, label: 'Budget', icon: '🎯' },
+                  { value: 'remaining' as BudgetSortOption, label: 'Remaining', icon: '📊' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setBudgetSortBy(option.value)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                      budgetSortBy === option.value
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {option.icon} {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="mt-4">
             {budgetCategories.length === 0 ? (
@@ -458,9 +520,7 @@ const Expenses: React.FC = () => {
             ) : (
               <>
                 <div className="space-y-4 lg:hidden">
-                  {[...budgetCategories]
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((category) => {
+                  {sortedBudgetCategories.map((category) => {
                       const iconColor = getIconTone(category.name);
                       const Icon = getCategoryIcon(category.name);
                       const colorClass = getColorClass(iconColor);
@@ -574,24 +634,49 @@ const Expenses: React.FC = () => {
                           </form>
 
                           {isExpanded ? (
-                            <div className="mt-3 rounded-xl border border-gray-200 bg-white/60 p-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+                            <div className="mt-4 rounded-2xl border-2 border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800/60">
                               {categoryExpenses.length === 0 ? (
-                                <span>No expenses for {category.name} in {activeMonthLabel}.</span>
+                                <div className="text-center py-6">
+                                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                    No expenses for {category.name} in {activeMonthLabel}
+                                  </p>
+                                </div>
                               ) : (
-                                <div className="space-y-2">
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between border-b border-gray-200 pb-2 dark:border-gray-700">
+                                    <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                      {categoryExpenses.length} {categoryExpenses.length === 1 ? 'Transaction' : 'Transactions'}
+                                    </span>
+                                    <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                                      Total: {formatCurrency(spent)}
+                                    </span>
+                                  </div>
                                   {categoryExpenses.map((expense) => {
                                     const expenseMonth = expense.date.slice(0, 7);
                                     const isOverBudgetRow =
                                       expenseMonth === budgetMonth && budget !== null && budget > 0 && spent > budget;
                                     return (
-                                      <div key={expense.id} className="flex items-center justify-between">
-                                        <div>
-                                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                      <div
+                                        key={expense.id}
+                                        className={`flex items-center justify-between rounded-xl p-3 transition ${
+                                          isOverBudgetRow
+                                            ? 'bg-red-50/80 dark:bg-red-900/20'
+                                            : 'bg-gray-50/80 dark:bg-gray-700/40'
+                                        }`}
+                                      >
+                                        <div className="flex-1">
+                                          <p className="text-sm font-bold text-gray-900 dark:text-white">
                                             {expense.description || 'No description'}
                                           </p>
-                                          <p className="text-xs text-gray-400">{formatDate(expense.date)}</p>
+                                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                            {formatDate(expense.date)}
+                                          </p>
                                         </div>
-                                        <span className={isOverBudgetRow ? 'text-red-500' : 'text-gray-900 dark:text-white'}>
+                                        <span
+                                          className={`text-base font-bold ${
+                                            isOverBudgetRow ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
+                                          }`}
+                                        >
                                           {formatCurrency(expense.amount)}
                                         </span>
                                       </div>
@@ -619,9 +704,7 @@ const Expenses: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="text-base text-gray-700 dark:text-gray-200">
-                      {[...budgetCategories]
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((category) => {
+                      {sortedBudgetCategories.map((category) => {
                           const iconColor = getIconTone(category.name);
                           const Icon = getCategoryIcon(category.name);
                           const colorClass = getColorClass(iconColor);
@@ -741,74 +824,92 @@ const Expenses: React.FC = () => {
                                 </td>
                               </tr>
                               {isExpanded ? (
-                                <tr className="bg-white dark:bg-gray-800">
-                                  <td colSpan={6} className="pb-4 pt-2">
+                                <tr className="bg-gradient-to-br from-purple-50/30 to-blue-50/30 dark:from-purple-900/10 dark:to-blue-900/10">
+                                  <td colSpan={6} className="pb-5 pt-3 px-5">
                                     {categoryExpenses.length === 0 ? (
-                                      <div className="rounded-xl border border-dashed border-gray-200 bg-white/60 p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-                                        No expenses for {category.name} in {activeMonthLabel}.
+                                      <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white/80 p-8 text-center dark:border-gray-600 dark:bg-gray-800/60">
+                                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                          No expenses for {category.name} in {activeMonthLabel}
+                                        </p>
                                       </div>
                                     ) : (
-                                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/40">
-                                        {categoryExpenses.map((expense, index) => {
-                                          const expenseMonth = expense.date.slice(0, 7);
-                                          const isOverBudgetRow =
-                                            expenseMonth === budgetMonth && budget !== null && budget > 0 && spent > budget;
+                                      <div className="rounded-2xl border-2 border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900/60">
+                                        <div className="border-b-2 border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50 px-5 py-3 dark:border-gray-700 dark:from-purple-900/20 dark:to-blue-900/20">
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-sm font-bold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                                              📋 {categoryExpenses.length} {categoryExpenses.length === 1 ? 'Transaction' : 'Transactions'}
+                                            </span>
+                                            <span className="text-sm font-bold text-purple-600 dark:text-purple-400">
+                                              Total: {formatCurrency(spent)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="p-3">
+                                          <div className="space-y-2">
+                                            {categoryExpenses.map((expense) => {
+                                              const expenseMonth = expense.date.slice(0, 7);
+                                              const isOverBudgetRow =
+                                                expenseMonth === budgetMonth && budget !== null && budget > 0 && spent > budget;
 
-                                          return (
-                                            <div
-                                              key={expense.id}
-                                              className={`flex items-center justify-between gap-4 px-4 py-2 ${
-                                                index !== categoryExpenses.length - 1
-                                                  ? 'border-b border-gray-200/70 dark:border-gray-700/70'
-                                                  : ''
-                                              }`}
-                                            >
-                                              <div className="flex items-center gap-3">
-                                                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${bgClass} ${colorClass}`} style={style}>
-                                                  <Icon className="h-4 w-4" />
-                                                </div>
-                                                <div className="space-y-0.5">
-                                                  <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                                                      {expense.description || 'No description'}
-                                                    </p>
-                                                    {isOverBudgetRow ? (
-                                                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600 dark:bg-red-500/10 dark:text-red-300">
-                                                        Over budget
-                                                      </span>
-                                                    ) : null}
-                                                  </div>
-                                                  <p className="text-xs text-gray-400">{formatDate(expense.date)}</p>
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center gap-3">
-                                                <span
-                                                  className={`text-base font-semibold ${
-                                                    isOverBudgetRow ? 'text-red-500 dark:text-red-300' : 'text-gray-900 dark:text-white'
+                                              return (
+                                                <div
+                                                  key={expense.id}
+                                                  className={`flex items-center justify-between gap-4 rounded-xl p-3 transition ${
+                                                    isOverBudgetRow
+                                                      ? 'bg-red-50 dark:bg-red-900/20'
+                                                      : 'bg-gray-50 hover:bg-gray-100 dark:bg-gray-800/60 dark:hover:bg-gray-800'
                                                   }`}
                                                 >
-                                                  {formatCurrency(expense.amount)}
-                                                </span>
-                                                <div className="flex items-center gap-2">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleEditExpense(expense)}
-                                                    className="rounded-full border border-gray-200 p-1.5 text-gray-500 transition hover:border-purple-500 hover:text-purple-600 dark:border-gray-700 dark:text-gray-300"
-                                                  >
-                                                    <Edit2 className="h-4 w-4" />
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setExpenseToDelete(expense)}
-                                                    className="rounded-full border border-gray-200 p-1.5 text-gray-500 transition hover:border-red-500 hover:text-red-500 dark:border-gray-700 dark:text-gray-300"
-                                                  >
-                                                    <Trash2 className="h-4 w-4" />
-                                                  </button>
+                                                  <div className="flex items-center gap-3 flex-1">
+                                                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${bgClass} ${colorClass} shadow-sm`} style={style}>
+                                                      <Icon className="h-5 w-5" />
+                                                    </div>
+                                                    <div className="flex-1 space-y-1">
+                                                      <div className="flex items-center gap-2">
+                                                        <p className="text-base font-bold text-gray-900 dark:text-white">
+                                                          {expense.description || 'No description'}
+                                                        </p>
+                                                        {isOverBudgetRow ? (
+                                                          <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
+                                                            ⚠️ Over budget
+                                                          </span>
+                                                        ) : null}
+                                                      </div>
+                                                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                        {formatDate(expense.date)}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex items-center gap-4">
+                                                    <span
+                                                      className={`text-lg font-bold ${
+                                                        isOverBudgetRow ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
+                                                      }`}
+                                                    >
+                                                      {formatCurrency(expense.amount)}
+                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleEditExpense(expense)}
+                                                        className="rounded-lg border-2 border-gray-200 p-2 text-gray-600 transition hover:border-purple-500 hover:bg-purple-50 hover:text-purple-600 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-purple-900/20"
+                                                      >
+                                                        <Edit2 className="h-4 w-4" />
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => setExpenseToDelete(expense)}
+                                                        className="rounded-lg border-2 border-gray-200 p-2 text-gray-600 transition hover:border-red-500 hover:bg-red-50 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-red-900/20"
+                                                      >
+                                                        <Trash2 className="h-4 w-4" />
+                                                      </button>
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
                                       </div>
                                     )}
                                   </td>
