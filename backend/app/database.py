@@ -2,16 +2,22 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import declarative_base
 from app.config import settings
 
+# Determine connect_args based on database type
+# For PostgreSQL with asyncpg: disable prepared statements for pgBouncer compatibility
+# For SQLite: no special connect_args needed
+connect_args = {}
+if settings.DATABASE_URL.startswith("postgresql"):
+    connect_args = {
+        "statement_cache_size": 0,  # Disable prepared statements for pgBouncer
+        "prepared_statement_cache_size": 0,
+    }
+
 # Create async engine
-# Disable prepared statements for pgBouncer compatibility (transaction pooling mode)
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.ENVIRONMENT == "development",
     future=True,
-    connect_args={
-        "statement_cache_size": 0,  # Disable prepared statements for pgBouncer
-        "prepared_statement_cache_size": 0,
-    },
+    connect_args=connect_args,
 )
 
 # Create async session factory
