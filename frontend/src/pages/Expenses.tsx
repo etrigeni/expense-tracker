@@ -49,6 +49,26 @@ const categoryIconMap: Record<string, LucideIcon> = {
   Travel: Plane,
 };
 
+// Specific color assignments for each category
+const categoryColorMap: Record<string, string> = {
+  'Bills': 'text-red-500',
+  'Food/Coffee': 'text-amber-500',
+  'Food': 'text-amber-500',
+  'Delivery': 'text-orange-500',
+  'Transport': 'text-blue-500',
+  'House rent': 'text-purple-500',
+  'Car': 'text-slate-600',
+  'Health': 'text-pink-500',
+  'Shopping': 'text-rose-500',
+  'Aesthetics': 'text-fuchsia-500',
+  'Gym': 'text-emerald-500',
+  'Subscriptions': 'text-indigo-500',
+  'Supermarket': 'text-green-500',
+  'Entertainment': 'text-violet-500',
+  'Savings': 'text-teal-500',
+  'Travel': 'text-sky-500',
+};
+
 const colorBackgroundMap: Record<string, string> = {
   'text-orange-500': 'bg-orange-500/10',
   'text-blue-500': 'bg-blue-500/10',
@@ -63,6 +83,11 @@ const colorBackgroundMap: Record<string, string> = {
   'text-emerald-600': 'bg-emerald-500/10',
   'text-sky-500': 'bg-sky-500/10',
   'text-indigo-500': 'bg-indigo-500/10',
+  'text-rose-500': 'bg-rose-500/10',
+  'text-fuchsia-500': 'bg-fuchsia-500/10',
+  'text-violet-500': 'bg-violet-500/10',
+  'text-teal-500': 'bg-teal-500/10',
+  'text-slate-600': 'bg-slate-600/10',
 };
 
 const iconPalette = [
@@ -77,6 +102,10 @@ const iconPalette = [
   'text-emerald-500',
   'text-sky-500',
   'text-indigo-500',
+  'text-rose-500',
+  'text-fuchsia-500',
+  'text-violet-500',
+  'text-teal-500',
 ];
 
 type ExpenseFormState = {
@@ -406,6 +435,11 @@ const Expenses: React.FC = () => {
 
   const getCategoryIcon = (name: string) => categoryIconMap[name] ?? Receipt;
   const getIconTone = (name: string) => {
+    // Check if category has a specific assigned color
+    if (categoryColorMap[name]) {
+      return categoryColorMap[name];
+    }
+    // Fall back to hash-based color assignment for custom categories
     const total = Array.from(name).reduce((sum, char) => sum + char.charCodeAt(0), 0);
     return iconPalette[total % iconPalette.length];
   };
