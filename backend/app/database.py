@@ -3,10 +3,15 @@ from sqlalchemy.orm import declarative_base
 from app.config import settings
 
 # Create async engine
+# Disable prepared statements for pgBouncer compatibility (transaction pooling mode)
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.ENVIRONMENT == "development",
     future=True,
+    connect_args={
+        "statement_cache_size": 0,  # Disable prepared statements for pgBouncer
+        "prepared_statement_cache_size": 0,
+    },
 )
 
 # Create async session factory
