@@ -28,8 +28,16 @@ export interface Expense {
   user_id: string;
   amount: number;
   category: string;
+  /** In a month listing, the date this expense falls on in that month. */
   date: string;
   description?: string;
+  is_recurring: boolean;
+  /** Last day a recurring expense applies; null while it keeps repeating. */
+  recurring_until?: string | null;
+  /** First occurrence of a recurring expense (set in month listings). */
+  start_date?: string | null;
+  /** Recurring expenses in a month listing: ticked as paid for that month. */
+  paid?: boolean | null;
   created_at: string;
   updated_at?: string;
 }
@@ -39,14 +47,11 @@ export interface ExpenseCreate {
   category: string;
   date: string;
   description?: string;
+  is_recurring?: boolean;
+  recurring_until?: string | null;
 }
 
-export interface ExpenseUpdate {
-  amount?: number;
-  category?: string;
-  date?: string;
-  description?: string;
-}
+export type ExpenseUpdate = Partial<ExpenseCreate>;
 
 export interface ExpenseStats {
   total: number;
@@ -59,7 +64,6 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
-  budget_monthly?: number | null;
   is_custom: boolean;
   created_at: string;
 }
@@ -68,40 +72,6 @@ export interface CategoryCreate {
   name: string;
   icon: string;
   color: string;
-  budget_monthly?: number | null;
-}
-
-export interface WishlistItem {
-  id: string;
-  user_id: string;
-  item_name: string;
-  price: number;
-  url?: string;
-  image_url?: string;
-  notes?: string;
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface WishlistCreate {
-  item_name: string;
-  price: number;
-  url?: string;
-  image_url?: string;
-  notes?: string;
-}
-
-export interface WishlistUpdate {
-  item_name?: string;
-  price?: number;
-  url?: string;
-  image_url?: string;
-  notes?: string;
-}
-
-export interface WishlistTotal {
-  total: number;
-  count: number;
 }
 
 export interface CategorySummary {
@@ -168,24 +138,6 @@ export interface DashboardOverview {
   monthly_income: MonthlyAmount[];
   monthly_savings: MonthlyAmount[];
   recent_transactions: Expense[];
-  wishlist_total: number;
-  wishlist_count: number;
-}
-
-export interface CategoryBudget {
-  id: string;
-  user_id: string;
-  category_id: string;
-  month: string;
-  amount: number | null;
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface CategoryBudgetUpsert {
-  category_id: string;
-  month: string;
-  amount: number | null;
 }
 
 export interface Savings {

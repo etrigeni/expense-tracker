@@ -1,63 +1,71 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, TrendingDown, Wallet, Landmark, Plus, Repeat, Edit2, Trash2 } from 'lucide-react';
-import { BarChart, Bar, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Link } from 'react-router-dom';
+import { ArrowDownRight, ArrowUpRight, Plus } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import toast from 'react-hot-toast';
 import { dashboardService } from '@/services/dashboardService';
 import { incomeService } from '@/services/incomeService';
 import { savingsService } from '@/services/savingsService';
-import { DashboardOverview, Income, IncomeCreate, IncomeUpdate } from '@/types';
-import { formatCurrency, formatDate } from '@/utils/format';
-import toast from 'react-hot-toast';
+import { expenseService } from '@/services/expenseService';
+import type { DashboardOverview, Expense, Income } from '@/types';
+import {
+  currentMonthKey,
+  formatCurrency,
+  formatDate,
+  formatMonthLabel,
+  monthKeyToDate,
+  shiftMonthKey,
+} from '@/utils/format';
+import { CategoryIcon, categoryStyle } from '@/utils/categories';
+import { Button, EmptyState, Input, Money, Panel, PanelHeader, Spinner } from '@/components/ui';
+import { ChartTooltip, LegendItem, useChartTheme } from '@/components/charts';
+import IncomeManager from '@/components/IncomeManager';
+import BillsChecklist from '@/components/BillsChecklist';
+import { useExpensesChanged, useQuickAdd } from '@/components/QuickAdd';
 
-const COLORS = ['#4da49a', '#93cec4', '#be8f84', '#dcc0b8', '#b8e1d9'];
+const TREND_MONTHS = 6;
+const SHORTCUT_COUNT = 5;
+
+const Change: React.FC<{ value?: number | null; noun: string }> = ({ value, noun }) => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return <span className="text-xs text-ink-3">No data for last month</span>;
+  }
+  const Icon = value >= 0 ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-ink-3">
+      <Icon className="h-3.5 w-3.5" />
+      {Math.abs(value).toFixed(0)}% {value >= 0 ? 'more' : 'less'} {noun} than last month
+    </span>
+  );
+};
+
+const greeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+};
 
 const Dashboard: React.FC = () => {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [incomeItems, setIncomeItems] = useState<Income[]>([]);
-  const [incomeModalOpen, setIncomeModalOpen] = useState(false);
-  const [incomeFormOpen, setIncomeFormOpen] = useState(false);
-  const [editingIncome, setEditingIncome] = useState<Income | null>(null);
-  const [incomeToDelete, setIncomeToDelete] = useState<Income | null>(null);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [incomeOpen, setIncomeOpen] = useState(false);
+  const [savedAmount, setSavedAmount] = useState<number | null>(null);
   const [savingsDraft, setSavingsDraft] = useState('');
   const [savingSavings, setSavingSavings] = useState(false);
-  const [newIncome, setNewIncome] = useState({
-    source: '',
-    amount: '',
-    date: '',
-    is_recurring: false,
-    frequency: 'monthly',
-    notes: '',
-  });
-  const [editIncome, setEditIncome] = useState({
-    source: '',
-    amount: '',
-    date: '',
-    is_recurring: false,
-    frequency: 'monthly',
-    notes: '',
-  });
+  const [bills, setBills] = useState<Expense[]>([]);
+  const chart = useChartTheme();
+  const openQuickAdd = useQuickAdd();
 
-  const getTodayDate = () => new Date().toISOString().split('T')[0];
-  const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
-  const toMonthDate = (month: string) => (month.length === 7 ? `${month}-01` : month);
-  const currentMonthLabel = new Date(`${getCurrentMonth()}-01`).toLocaleString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
-
-  useEffect(() => {
-    loadOverview();
-    loadIncomes();
-    loadSavings();
-  }, []);
+  const month = currentMonthKey();
+  const monthName = formatMonthLabel(month).split(' ')[0];
 
   const loadOverview = async () => {
     try {
-      const data = await dashboardService.getOverview();
-      setOverview(data);
+      setOverview(await dashboardService.getOverview());
     } catch (error) {
-      toast.error('Failed to load dashboard');
+      toast.error('Could not load the overview.');
     } finally {
       setLoading(false);
     }
@@ -65,748 +73,430 @@ const Dashboard: React.FC = () => {
 
   const loadIncomes = async () => {
     try {
-      const data = await incomeService.getIncomes();
-      setIncomeItems(data);
+      setIncomes(await incomeService.getIncomes());
     } catch (error) {
-      toast.error('Failed to load income.');
+      toast.error('Could not load income.');
     }
   };
 
   const loadSavings = async () => {
     try {
-      const data = await savingsService.getSavings({ month: toMonthDate(getCurrentMonth()) });
-      setSavingsDraft(data?.amount != null ? String(data.amount) : '');
+      const data = await savingsService.getSavings({ month: monthKeyToDate(month) });
+      const amount = data?.amount != null ? Number(data.amount) : null;
+      setSavedAmount(amount);
+      setSavingsDraft(amount != null ? String(amount) : '');
     } catch (error) {
-      toast.error('Failed to load savings.');
+      toast.error('Could not load savings.');
     }
   };
 
-  const handleAddIncome = () => {
-    setEditingIncome(null);
-    setNewIncome({
-      source: '',
-      amount: '',
-      date: getTodayDate(),
-      is_recurring: false,
-      frequency: 'monthly',
-      notes: '',
-    });
-    setIncomeFormOpen(true);
+  const loadBills = async () => {
+    try {
+      const expenses = await expenseService.getExpenses({ month: monthKeyToDate(month) });
+      setBills(expenses.filter((expense) => expense.is_recurring));
+    } catch (error) {
+      toast.error('Could not load monthly bills.');
+    }
   };
 
-  const handleEditIncome = (income: Income) => {
-    setEditingIncome(income);
-    setEditIncome({
-      source: income.source,
-      amount: income.amount.toString(),
-      date: income.date,
-      is_recurring: income.is_recurring,
-      frequency: income.frequency || 'monthly',
-      notes: income.notes ?? '',
-    });
-    setIncomeFormOpen(true);
+  const handleTogglePaid = async (bill: Expense, paid: boolean) => {
+    setBills((prev) => prev.map((item) => (item.id === bill.id ? { ...item, paid } : item)));
+    try {
+      await expenseService.setPaid(bill.id, monthKeyToDate(month), paid);
+    } catch (error) {
+      setBills((prev) => prev.map((item) => (item.id === bill.id ? { ...item, paid: !paid } : item)));
+      toast.error('Could not update the checklist.');
+    }
   };
 
-  const handleCreateIncome = async (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    loadOverview();
+    loadIncomes();
+    loadSavings();
+    loadBills();
+  }, []);
+
+  useExpensesChanged(() => {
+    loadOverview();
+    loadBills();
+  });
+
+  const handleSaveSavings = async (event: React.FormEvent) => {
     event.preventDefault();
-
-    if (!newIncome.source.trim() || !newIncome.amount || !newIncome.date) {
-      toast.error('Source, amount, and date are required.');
-      return;
-    }
-
-    const payload: IncomeCreate = {
-      source: newIncome.source.trim(),
-      amount: Number(newIncome.amount),
-      date: newIncome.date,
-      is_recurring: newIncome.is_recurring,
-      frequency: newIncome.is_recurring ? newIncome.frequency : undefined,
-      notes: newIncome.notes || undefined,
-    };
-
-    try {
-      await incomeService.createIncome(payload);
-      await loadIncomes();
-      await loadOverview();
-      setIncomeFormOpen(false);
-      toast.success('Income added.');
-    } catch (error) {
-      toast.error('Failed to add income.');
-    }
-  };
-
-  const handleUpdateIncome = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!editingIncome) {
-      return;
-    }
-
-    if (!editIncome.source.trim() || !editIncome.amount || !editIncome.date) {
-      toast.error('Source, amount, and date are required.');
-      return;
-    }
-
-    const payload: IncomeUpdate = {
-      source: editIncome.source.trim(),
-      amount: Number(editIncome.amount),
-      date: editIncome.date,
-      is_recurring: editIncome.is_recurring,
-      frequency: editIncome.is_recurring ? editIncome.frequency : undefined,
-      notes: editIncome.notes || undefined,
-    };
-
-    try {
-      await incomeService.updateIncome(editingIncome.id, payload);
-      await loadIncomes();
-      await loadOverview();
-      setIncomeFormOpen(false);
-      setEditingIncome(null);
-      toast.success('Income updated.');
-    } catch (error) {
-      toast.error('Failed to update income.');
-    }
-  };
-
-  const handleDeleteIncome = async () => {
-    if (!incomeToDelete) {
-      return;
-    }
-
-    try {
-      await incomeService.deleteIncome(incomeToDelete.id);
-      await loadIncomes();
-      await loadOverview();
-      setIncomeToDelete(null);
-      toast.success('Income deleted.');
-    } catch (error) {
-      toast.error('Failed to delete income.');
-    }
-  };
-
-  const handleSaveSavings = async () => {
     const value = savingsDraft.trim();
-    if (!value) {
-      try {
-        setSavingSavings(true);
-        await savingsService.upsertSavings({ month: toMonthDate(getCurrentMonth()), amount: null });
-        toast.success('Savings cleared.');
-      } catch (error) {
-        toast.error('Failed to update savings.');
-      } finally {
-        setSavingSavings(false);
-      }
+    const parsed = value ? Number(value) : null;
+    if (parsed !== null && (Number.isNaN(parsed) || parsed < 0)) {
+      toast.error('Savings must be zero or more.');
       return;
     }
-
-    const parsed = Number(value);
-    if (Number.isNaN(parsed) || parsed < 0) {
-      toast.error('Enter a valid non-negative savings amount.');
-      return;
-    }
+    if (parsed === savedAmount) return;
 
     try {
       setSavingSavings(true);
-      await savingsService.upsertSavings({ month: toMonthDate(getCurrentMonth()), amount: parsed });
-      toast.success('Savings updated.');
+      await savingsService.upsertSavings({ month: monthKeyToDate(month), amount: parsed });
+      setSavedAmount(parsed);
+      await loadOverview();
+      toast.success(parsed === null ? 'Savings cleared.' : 'Savings saved.');
     } catch (error) {
-      toast.error('Failed to update savings.');
+      toast.error('Could not save savings.');
     } finally {
       setSavingSavings(false);
     }
   };
 
-  const { stackedChartData, stackedCategories } = useMemo(() => {
-    const entries = overview?.monthly_category_spend ?? [];
-    if (entries.length === 0) {
-      return { stackedChartData: [], stackedCategories: [] as string[] };
-    }
+  const trend = useMemo(() => {
+    const totals = (entries: { month: string; total: number }[] = []) => {
+      const byMonth = new Map<string, number>();
+      entries.forEach((entry) => {
+        const key = entry.month.slice(0, 7);
+        byMonth.set(key, (byMonth.get(key) ?? 0) + Number(entry.total));
+      });
+      return byMonth;
+    };
+    const spent = totals(overview?.monthly_category_spend);
+    const income = totals(overview?.monthly_income);
+    const saved = totals(overview?.monthly_savings);
 
-    const categories = Array.from(new Set(entries.map((item) => item.category))).sort();
-    const byMonth = new Map<string, Record<string, string | number>>();
-
-    entries.forEach((item) => {
-      const monthKey = item.month.slice(0, 7);
-      if (!byMonth.has(monthKey)) {
-        byMonth.set(monthKey, { month: monthKey });
-      }
-      byMonth.get(monthKey)![item.category] = Number(item.total);
+    return Array.from({ length: TREND_MONTHS }, (_, index) => {
+      const key = shiftMonthKey(month, index - (TREND_MONTHS - 1));
+      return {
+        label: formatMonthLabel(key, 'short'),
+        income: income.get(key) ?? 0,
+        spent: spent.get(key) ?? 0,
+        saved: saved.get(key) ?? 0,
+      };
     });
+  }, [overview, month]);
 
-    const stacked = Array.from(byMonth.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, data]) => ({
-        ...data,
-        label: new Date(`${month}-01`).toLocaleString('en-US', { month: 'short', year: '2-digit' }),
-      }));
-
-    return { stackedChartData: stacked, stackedCategories: categories };
+  // Categories used most often over the trend window, for one-tap adding.
+  const shortcuts = useMemo(() => {
+    const totals = new Map<string, number>();
+    (overview?.monthly_category_spend ?? []).forEach((entry) => {
+      totals.set(entry.category, (totals.get(entry.category) ?? 0) + Number(entry.total));
+    });
+    return Array.from(totals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, SHORTCUT_COUNT)
+      .map(([category]) => category);
   }, [overview]);
 
-  const monthSeries = useMemo(() => {
-    const now = new Date();
-    const series = [];
-    for (let i = 5; i >= 0; i -= 1) {
-      const dateValue = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = dateValue.toISOString().slice(0, 7);
-      series.push({
-        key,
-        label: dateValue.toLocaleString('en-US', { month: 'short', year: '2-digit' }),
-      });
-    }
-    return series;
-  }, []);
-
-  const monthlyIncomeData = useMemo(() => {
-    const entries = overview?.monthly_income ?? [];
-    const byMonth = new Map(entries.map((item) => [item.month.slice(0, 7), Number(item.total)]));
-    return monthSeries.map((month) => ({
-      label: month.label,
-      total: byMonth.get(month.key) ?? 0,
-    }));
-  }, [overview, monthSeries]);
-
-  const monthlySavingsData = useMemo(() => {
-    const entries = overview?.monthly_savings ?? [];
-    const byMonth = new Map(entries.map((item) => [item.month.slice(0, 7), Number(item.total)]));
-    return monthSeries.map((month) => ({
-      label: month.label,
-      total: byMonth.get(month.key) ?? 0,
-    }));
-  }, [overview, monthSeries]);
-
-  const formatMom = (value?: number | null) => {
-    if (value === null || value === undefined || Number.isNaN(value)) {
-      return 'MoM: —';
-    }
-    const sign = value > 0 ? '+' : '';
-    return `MoM: ${sign}${value.toFixed(1)}%`;
-  };
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    );
+    return <Spinner />;
   }
+
+  const spent = Number(overview?.total_expenses_month ?? 0);
+  const income = Number(overview?.income_total_month ?? 0);
+  const balance = Number(overview?.net_balance_month ?? income - spent);
+  const spentRatio = income > 0 ? spent / income : 0;
+  const categories = overview?.expenses_by_category ?? [];
+  const topCategory = Number(categories[0]?.total ?? 0);
+  const recent = overview?.recent_transactions ?? [];
+  const hasTrend = trend.some((row) => row.income > 0 || row.spent > 0 || row.saved > 0);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+      <p className="text-sm text-ink-3">
+        {greeting()}. Here is {monthName} so far.
+      </p>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="card-surface p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Expenses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {formatCurrency(Number(overview?.total_expenses_month || 0))}
-              </p>
-              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                {overview?.expenses_mom_percentage !== null && overview?.expenses_mom_percentage !== undefined ? (
-                  overview.expenses_mom_percentage >= 0 ? (
-                    <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-red-500" />
-                  )
-                ) : null}
-                <span>{formatMom(overview?.expenses_mom_percentage)}</span>
-              </div>
-            </div>
-            <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-full">
-              <Wallet className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-          </div>
-        </motion.div>
+      <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
+        <section className="relative overflow-hidden rounded-panel bg-hero bg-hero-gradient p-6 text-ink sm:p-8">
+          <div
+            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/50 blur-3xl"
+            aria-hidden="true"
+          />
+          <div className="relative">
+            {income > 0 ? (
+              <>
+                <p className="text-sm font-medium text-ink-2">
+                  {balance >= 0 ? `Left to spend in ${monthName}` : `Over your ${monthName} income by`}
+                </p>
+                <p className="mt-2 text-5xl font-semibold tracking-tight sm:text-7xl">
+                  <Money
+                    amount={Math.abs(balance)}
+                    className={balance >= 0 ? '' : 'text-danger'}
+                    fractionClassName="text-[0.4em] font-medium text-ink-3"
+                  />
+                </p>
+                <div className="mt-6 max-w-md">
+                  <div
+                    className="h-2 overflow-hidden rounded-full bg-white/70"
+                    role="meter"
+                    aria-label="Share of income spent"
+                    aria-valuemin={0}
+                    aria-valuemax={income}
+                    aria-valuenow={spent}
+                  >
+                    <div
+                      className={`h-full rounded-full ${spentRatio > 1 ? 'bg-danger' : 'bg-accent'}`}
+                      style={{ width: `${Math.min(spentRatio, 1) * 100}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-ink-2">
+                    <span className="num font-medium text-ink">{formatCurrency(spent)}</span> of{' '}
+                    <span className="num font-medium text-ink">{formatCurrency(income)}</span> spent (
+                    {Math.round(spentRatio * 100)}%)
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-ink-2">Spent in {monthName}</p>
+                <p className="mt-2 text-5xl font-semibold tracking-tight sm:text-7xl">
+                  <Money amount={spent} fractionClassName="text-[0.4em] font-medium text-ink-3" />
+                </p>
+                <p className="mt-6 max-w-sm text-sm text-ink-2">
+                  Add your income to see how much you have left this month.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIncomeOpen(true)}
+                  className="mt-3 inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-medium text-accent-on"
+                >
+                  Add income
+                </button>
+              </>
+            )}
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="card-surface p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Income</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {formatCurrency(Number(overview?.income_total_month || 0))}
-              </p>
-              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                {overview?.income_mom_percentage !== null && overview?.income_mom_percentage !== undefined ? (
-                  overview.income_mom_percentage >= 0 ? (
-                    <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-red-500" />
-                  )
-                ) : null}
-                <span>{formatMom(overview?.income_mom_percentage)}</span>
-              </div>
+            <div className="mt-8 flex flex-wrap items-center gap-2">
+              {shortcuts.map((category) => {
+                const { icon: Icon } = categoryStyle(category);
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => openQuickAdd(category)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/70 px-3.5 text-sm font-medium text-ink transition-colors hover:bg-white"
+                  >
+                    <Icon className="h-4 w-4" />
+                    {category}
+                  </button>
+                );
+              })}
               <button
                 type="button"
-                onClick={() => setIncomeModalOpen(true)}
-                className="mt-2 text-xs font-semibold text-emerald-600 hover:text-emerald-500"
+                onClick={() => openQuickAdd()}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-sm font-medium text-accent-on transition-colors hover:bg-accent/90"
               >
-                Manage income
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                {shortcuts.length > 0 ? 'Other' : 'Add expense'}
               </button>
             </div>
-            <div className="bg-emerald-100 dark:bg-emerald-900/30 p-3 rounded-full">
-              <Landmark className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
           </div>
-        </motion.div>
+        </section>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="card-surface p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="w-full">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Savings for {currentMonthLabel}
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={savingsDraft}
-                  onChange={(event) => setSavingsDraft(event.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveSavings}
-                  disabled={savingSavings}
-                  className="rounded-xl bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:hover:bg-gray-600"
-                >
-                  {savingSavings ? 'Saving' : 'Save'}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-gray-400">
-                {savingsDraft ? formatCurrency(Number(savingsDraft)) : 'Not set'}
-              </p>
-            </div>
-            <div className="ml-4 bg-teal-100 dark:bg-teal-900/30 p-3 rounded-full">
-              <Landmark className="w-6 h-6 text-teal-600 dark:text-teal-400" />
-            </div>
+        <Panel as="div" className="flex flex-col divide-y divide-line">
+          <div className="flex-1 p-5 sm:px-6">
+            <p className="text-sm text-ink-3">Spent</p>
+            <p className="mt-1 text-2xl font-semibold">
+              <Money amount={spent} fractionClassName="text-[0.6em] text-ink-3" />
+            </p>
+            <p className="mt-1">
+              <Change value={overview?.expenses_mom_percentage} noun="spent" />
+            </p>
           </div>
-        </motion.div>
+          <div className="flex-1 p-5 sm:px-6">
+            <p className="flex items-center justify-between text-sm text-ink-3">
+              Income
+              <button
+                type="button"
+                onClick={() => setIncomeOpen(true)}
+                className="text-sm font-medium text-accent-ink hover:underline"
+              >
+                Manage
+              </button>
+            </p>
+            <p className="mt-1 text-2xl font-semibold">
+              <Money amount={income} fractionClassName="text-[0.6em] text-ink-3" />
+            </p>
+            <p className="mt-1">
+              <Change value={overview?.income_mom_percentage} noun="earned" />
+            </p>
+          </div>
+          <div className="flex-1 p-5 sm:px-6">
+            <label htmlFor="savings-input" className="text-sm text-ink-3">
+              Put aside in {monthName}
+            </label>
+            <form onSubmit={handleSaveSavings} className="mt-2 flex gap-2">
+              <Input
+                id="savings-input"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={savingsDraft}
+                onChange={(event) => setSavingsDraft(event.target.value)}
+                className="num"
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={savingSavings || (savingsDraft.trim() ? Number(savingsDraft) : null) === savedAmount}
+              >
+                Save
+              </Button>
+            </form>
+          </div>
+        </Panel>
       </div>
 
-      <AnimatePresence>
-        {incomeModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-            onClick={() => setIncomeModalOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.92, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.92, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-              className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Income</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Add or edit recurring and one-off income.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleAddIncome}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add income
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIncomeModalOpen(false)}
-                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {incomeItems.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-white/60 p-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
-                    No income records yet. Add your salary or other income sources.
-                  </div>
-                ) : (
-                  incomeItems.map((income) => (
-                    <div
-                      key={income.id}
-                      className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-gray-900 dark:text-white">{income.source}</h3>
-                          {income.is_recurring ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
-                              <Repeat className="h-3 w-3" />
-                              {income.frequency || 'recurring'}
-                            </span>
-                          ) : null}
-                        </div>
-                        {income.notes ? (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{income.notes}</p>
-                        ) : null}
-                        <p className="mt-1 text-xs text-gray-400">{formatDate(income.date)}</p>
-                      </div>
-                      <div className="flex items-center justify-between gap-6 md:justify-end">
-                        <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {formatCurrency(Number(income.amount))}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <BillsChecklist
+          month={month}
+          bills={bills}
+          onTogglePaid={handleTogglePaid}
+          onAdd={() => openQuickAdd('', { recurring: true })}
+        />
+        <Panel>
+          <PanelHeader
+            title="Where it went"
+            description={`Spending by category in ${monthName}`}
+          />
+          {categories.length === 0 ? (
+            <EmptyState title="Nothing spent yet this month" description="Expenses you add show up here by category." />
+          ) : (
+            <div className="p-5">
+              <ul className="space-y-4">
+                {categories.map((item) => (
+                  <li key={item.category} className="flex items-center gap-3">
+                    <CategoryIcon name={item.category} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                        <span className="truncate font-medium text-ink">{item.category}</span>
+                        <span className="num shrink-0 text-ink">
+                          {formatCurrency(Number(item.total))}
+                          <span className="ml-2 inline-block w-9 text-right text-xs text-ink-3">
+                            {Math.round(Number(item.percentage))}%
+                          </span>
                         </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEditIncome(income)}
-                            className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-gray-700 dark:text-gray-300"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIncomeToDelete(income)}
-                            className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:border-red-500 hover:text-red-500 dark:border-gray-700 dark:text-gray-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                      </div>
+                      <div className="mt-1.5 h-1.5 rounded-full bg-sunken">
+                        <div
+                          className="h-full rounded-full bg-accent"
+                          style={{ width: `${topCategory > 0 ? (Number(item.total) / topCategory) * 100 : 0}%` }}
+                        />
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {incomeFormOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-            onClick={() => setIncomeFormOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.92, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.92, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-              className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {editingIncome ? 'Edit Income' : 'Add Income'}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setIncomeFormOpen(false)}
-                  className="rounded-full border border-gray-200 px-3 py-1 text-sm text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300"
-                >
-                  Close
-                </button>
-              </div>
-              <form className="mt-4 space-y-4" onSubmit={editingIncome ? handleUpdateIncome : handleCreateIncome}>
-                <label className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                  Source
-                  <input
-                    type="text"
-                    placeholder="e.g. Salary"
-                    value={editingIncome ? editIncome.source : newIncome.source}
-                    onChange={(event) =>
-                      editingIncome
-                        ? setEditIncome((prev) => ({ ...prev, source: event.target.value }))
-                        : setNewIncome((prev) => ({ ...prev, source: event.target.value }))
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                </label>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                    Amount
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={editingIncome ? editIncome.amount : newIncome.amount}
-                      onChange={(event) =>
-                        editingIncome
-                          ? setEditIncome((prev) => ({ ...prev, amount: event.target.value }))
-                          : setNewIncome((prev) => ({ ...prev, amount: event.target.value }))
-                      }
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
-                  </label>
-                  <label className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                    Date
-                    <input
-                      type="date"
-                      value={editingIncome ? editIncome.date : newIncome.date}
-                      onChange={(event) =>
-                        editingIncome
-                          ? setEditIncome((prev) => ({ ...prev, date: event.target.value }))
-                          : setNewIncome((prev) => ({ ...prev, date: event.target.value }))
-                      }
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
-                  </label>
-                </div>
-                <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-                  <span>Recurring income</span>
-                  <input
-                    type="checkbox"
-                    checked={editingIncome ? editIncome.is_recurring : newIncome.is_recurring}
-                    onChange={(event) =>
-                      editingIncome
-                        ? setEditIncome((prev) => ({ ...prev, is_recurring: event.target.checked }))
-                        : setNewIncome((prev) => ({ ...prev, is_recurring: event.target.checked }))
-                    }
-                    className="h-4 w-4"
-                  />
-                </div>
-                {(editingIncome ? editIncome.is_recurring : newIncome.is_recurring) ? (
-                  <label className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                    Frequency
-                    <select
-                      value={editingIncome ? editIncome.frequency : newIncome.frequency}
-                      onChange={(event) =>
-                        editingIncome
-                          ? setEditIncome((prev) => ({ ...prev, frequency: event.target.value }))
-                          : setNewIncome((prev) => ({ ...prev, frequency: event.target.value }))
-                      }
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="yearly">Yearly</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </label>
-                ) : null}
-                <label className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                  Notes
-                  <input
-                    type="text"
-                    placeholder="Optional notes"
-                    value={editingIncome ? editIncome.notes : newIncome.notes}
-                    onChange={(event) =>
-                      editingIncome
-                        ? setEditIncome((prev) => ({ ...prev, notes: event.target.value }))
-                        : setNewIncome((prev) => ({ ...prev, notes: event.target.value }))
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  />
-                </label>
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setIncomeFormOpen(false)}
-                    className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    {editingIncome ? 'Save Changes' : 'Save Income'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {incomeToDelete && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-            onClick={() => setIncomeToDelete(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.92, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.92, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Delete income?</h2>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                This removes {incomeToDelete.source} from your income list.
-              </p>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIncomeToDelete(null)}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteIncome}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Delete
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Charts and Recent Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Category Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="card-surface p-6"
-        >
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Spending by Category
-          </h2>
-          {stackedChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={stackedChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Legend />
-                {stackedCategories.map((category, index) => (
-                  <Bar key={category} dataKey={category} stackId="spend" fill={COLORS[index % COLORS.length]} />
+                  </li>
                 ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-64 text-gray-500">
-              No expense data available
+              </ul>
             </div>
           )}
-        </motion.div>
+        </Panel>
 
-        {/* Recent Transactions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="card-surface p-6"
-        >
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Recent Transactions
-          </h2>
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            {overview?.recent_transactions && overview.recent_transactions.length > 0 ? (
-              overview.recent_transactions.slice(0, 10).map((transaction, index) => (
-                <motion.div
-                  key={transaction.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {transaction.category}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(transaction.date)}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel>
+          <PanelHeader
+            title="Latest expenses"
+            action={
+              <Link to="/expenses" className="text-sm font-medium text-accent-ink hover:underline">
+                See all
+              </Link>
+            }
+          />
+          {recent.length === 0 ? (
+            <EmptyState
+              title="No expenses yet"
+              description="Add your first one to start tracking."
+              action={
+                <Button onClick={() => openQuickAdd()}>
+                  <Plus className="h-4 w-4" />
+                  Add expense
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="divide-y divide-line px-5 pb-2 pt-2">
+              {recent.slice(0, 8).map((expense) => (
+                <li key={expense.id} className="flex items-center gap-3 py-3">
+                  <CategoryIcon name={expense.category} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">{expense.description || expense.category}</p>
+                    <p className="truncate text-xs text-ink-3">
+                      {expense.description ? `${expense.category}, ` : ''}
+                      {formatDate(expense.date)}
                     </p>
                   </div>
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {formatCurrency(Number(transaction.amount))}
-                  </p>
-                </motion.div>
-              ))
-            ) : (
-              <div className="flex items-center justify-center h-64 text-gray-500">
-                No recent transactions
-              </div>
-            )}
+                  <Money amount={Number(expense.amount)} className="text-sm font-medium text-ink" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+        <Panel>
+          <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5">
+            <h2 className="text-base font-semibold text-ink">Last 6 months</h2>
+            <div className="flex flex-wrap gap-3">
+              <LegendItem color={chart.income} label="Income" />
+              <LegendItem color={chart.spent} label="Spent" />
+            </div>
           </div>
-        </motion.div>
+          {hasTrend ? (
+            <>
+              <div className="h-72 px-2 pb-4 pt-6" aria-hidden="true">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={trend} barGap={2} barCategoryGap="28%">
+                    <CartesianGrid vertical={false} stroke={chart.grid} />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={{ stroke: chart.grid }}
+                      tick={{ fill: chart.axis, fontSize: 12 }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      width={56}
+                      tick={{ fill: chart.axis, fontSize: 12 }}
+                      tickFormatter={(value: number) =>
+                        value >= 1000 ? `€${(value / 1000).toFixed(1).replace(/\.0$/, '')}k` : `€${value}`
+                      }
+                    />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: chart.grid, opacity: 0.5 }} />
+                    <Bar dataKey="income" name="Income" fill={chart.income} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                    <Bar dataKey="spent" name="Spent" fill={chart.spent} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <table className="sr-only">
+                <caption>Income, spending and savings for the last 6 months</caption>
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th>Income</th>
+                    <th>Spent</th>
+                    <th>Put aside</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trend.map((row) => (
+                    <tr key={row.label}>
+                      <td>{row.label}</td>
+                      <td>{formatCurrency(row.income)}</td>
+                      <td>{formatCurrency(row.spent)}</td>
+                      <td>{formatCurrency(row.saved)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <EmptyState title="No history yet" description="Your monthly totals build up here over time." />
+          )}
+        </Panel>
       </div>
 
-      {/* Income & Savings Trends */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="card-surface p-6"
-        >
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Income by Month</h2>
-          {monthlyIncomeData.some((item) => item.total > 0) ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={monthlyIncomeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Bar dataKey="total" fill="#4da49a" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-56 text-gray-500">
-              No income data available
-            </div>
-          )}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="card-surface p-6"
-        >
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Savings by Month</h2>
-          {monthlySavingsData.some((item) => item.total > 0) ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={monthlySavingsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                <Bar dataKey="total" fill="#be8f84" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-56 text-gray-500">
-              No savings data available
-            </div>
-          )}
-        </motion.div>
-      </div>
+      <IncomeManager
+        open={incomeOpen}
+        onClose={() => setIncomeOpen(false)}
+        incomes={incomes}
+        onChange={async () => {
+          await Promise.all([loadIncomes(), loadOverview()]);
+        }}
+      />
     </div>
   );
 };

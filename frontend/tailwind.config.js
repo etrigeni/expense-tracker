@@ -1,57 +1,44 @@
 /** @type {import('tailwindcss').Config} */
-const nudeScale = {
-  50: '#f8f2f0',
-  100: '#f2e6e3',
-  200: '#e8d5d0',
-  300: '#dcc0b8',
-  400: '#cfa79d',
-  500: '#be8f84',
-  600: '#ab776d',
-  700: '#916057',
-  800: '#744b45',
-  900: '#5a3a36',
-};
-
-const aquaScale = {
-  50: '#eef8f6',
-  100: '#d7efe9',
-  200: '#b8e1d9',
-  300: '#93cec4',
-  400: '#6fb9af',
-  500: '#4da49a',
-  600: '#3a8b81',
-  700: '#2f7068',
-  800: '#265a54',
-  900: '#1f4641',
-};
+// Colours are CSS variables (see src/index.css).
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  // Light only: `class` keeps dark: variants from switching on with the OS setting.
+  darkMode: 'class',
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Geist', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       colors: {
-        primary: aquaScale,
-        teal: aquaScale,
-        cyan: aquaScale,
-        blue: aquaScale,
-        emerald: aquaScale,
-        purple: nudeScale,
-        pink: nudeScale,
-        orange: nudeScale,
-        yellow: nudeScale,
-        gray: nudeScale,
+        canvas: token('canvas'),
+        surface: token('surface'),
+        sunken: token('sunken'),
+        line: token('line'),
+        ink: {
+          DEFAULT: token('ink'),
+          2: token('ink-2'),
+          3: token('ink-3'),
+        },
+        accent: {
+          DEFAULT: token('accent'),
+          soft: token('accent-soft'),
+          ink: token('accent-ink'),
+          on: token('on-accent'),
+        },
+        danger: {
+          DEFAULT: token('danger'),
+          soft: token('danger-soft'),
+        },
+        warn: token('warn'),
+        hero: token('hero'),
       },
-      backgroundImage: {
-        'gradient-primary': 'linear-gradient(120deg, #93cec4, #4da49a)',
-        'gradient-accent': 'linear-gradient(120deg, #f2e6e3, #dcc0b8)',
+      borderRadius: {
+        control: '10px',
+        panel: '16px',
       },
     },
   },
   plugins: [],
-}
+};

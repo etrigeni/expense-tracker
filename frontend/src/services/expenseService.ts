@@ -2,7 +2,9 @@ import api from './api';
 import { Expense, ExpenseCreate, ExpenseUpdate, ExpenseStats } from '@/types';
 
 export const expenseService = {
+  /** With `month` (any day in it), returns that month's expenses with recurring ones included. */
   async getExpenses(params?: {
+    month?: string;
     date_from?: string;
     date_to?: string;
     category?: string;
@@ -11,6 +13,15 @@ export const expenseService = {
   }): Promise<Expense[]> {
     const response = await api.get<Expense[]>('/expenses/', { params });
     return response.data;
+  },
+
+  async getRecurring(): Promise<Expense[]> {
+    const response = await api.get<Expense[]>('/expenses/recurring');
+    return response.data;
+  },
+
+  async setPaid(id: string, month: string, paid: boolean): Promise<void> {
+    await api.put(`/expenses/${id}/paid`, { month, paid });
   },
 
   async getExpense(id: string): Promise<Expense> {
