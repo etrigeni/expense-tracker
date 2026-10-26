@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from datetime import date, datetime
+from datetime import date as DateType  # a field named `date` shadows the type inside schema classes
 from decimal import Decimal
 import uuid
 
@@ -44,6 +45,8 @@ class ExpenseBase(BaseModel):
     category: str
     date: date
     description: Optional[str] = None
+    is_recurring: bool = False
+    recurring_until: Optional[DateType] = None
 
 
 class ExpenseCreate(ExpenseBase):
@@ -55,15 +58,27 @@ class ExpenseUpdate(BaseModel):
     category: Optional[str] = None
     date: Optional[date] = None
     description: Optional[str] = None
+    is_recurring: Optional[bool] = None
+    recurring_until: Optional[DateType] = None
 
 
 class ExpenseResponse(ExpenseBase):
     id: uuid.UUID
     user_id: uuid.UUID
+    # For a recurring expense listed by month, `date` is that month's occurrence and
+    # `start_date` the first one; otherwise they are equal.
+    start_date: Optional[DateType] = None
+    # Recurring expenses in a month listing: whether it is ticked as paid for that month
+    paid: Optional[bool] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RecurringPaymentUpdate(BaseModel):
+    month: DateType
+    paid: bool
 
 
 class ExpenseStats(BaseModel):
@@ -77,7 +92,6 @@ class CategoryBase(BaseModel):
     name: str
     icon: str
     color: str
-    budget_monthly: Optional[Decimal] = None
 
 
 class CategoryCreate(CategoryBase):
@@ -88,7 +102,6 @@ class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     icon: Optional[str] = None
     color: Optional[str] = None
-    budget_monthly: Optional[Decimal] = None
 
 
 class CategoryResponse(CategoryBase):
@@ -97,46 +110,6 @@ class CategoryResponse(CategoryBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-
-
-# Wishlist Schemas
-class WishlistBase(BaseModel):
-    item_name: str
-    price: Decimal = Field(..., gt=0, decimal_places=2)
-    url: Optional[str] = None
-    image_url: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class WishlistCreate(WishlistBase):
-    pass
-
-
-class WishlistUpdate(BaseModel):
-    item_name: Optional[str] = None
-    price: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
-    url: Optional[str] = None
-    image_url: Optional[str] = None
-    notes: Optional[str] = None
-
-
-class WishlistResponse(WishlistBase):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class WishlistTotal(BaseModel):
-    total: Decimal
-    count: int
-
-
-class WishlistPurchase(BaseModel):
-    purchase_date: Optional[date] = None
-    category: Optional[str] = "Shopping"
 
 
 # Income Schemas
@@ -205,26 +178,6 @@ class DashboardOverview(BaseModel):
     monthly_income: list[MonthlyAmount]
     monthly_savings: list[MonthlyAmount]
     recent_transactions: list[ExpenseResponse]
-    wishlist_total: Decimal
-    wishlist_count: int
-
-
-class CategoryBudgetUpsert(BaseModel):
-    category_id: uuid.UUID
-    month: date
-    amount: Optional[Decimal] = None
-
-
-class CategoryBudgetResponse(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    category_id: uuid.UUID
-    month: date
-    amount: Optional[Decimal] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class SavingsUpsert(BaseModel):

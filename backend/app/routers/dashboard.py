@@ -4,10 +4,11 @@ from sqlalchemy import select, func, and_, or_, extract
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 from app.database import get_db
-from app.models import User, Expense, Wishlist, Income, Savings
+from app.models import User, Expense, Income, Savings
 from app.schemas import DashboardOverview, CategorySummary, ExpenseResponse, MonthlyCategorySpend, MonthlyAmount
 from app.dependencies import get_current_user
 from app.utils import calculate_percentage
+from app import recurring
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -32,59 +33,45 @@ async def get_dashboard_overview(
 ):
     """Get dashboard summary"""
     today = date.today()
-    current_month = today.month
-    current_year = today.year
     current_month_start = today.replace(day=1)
     trend_start = shift_month(current_month_start, -5)
     previous_month_start = shift_month(current_month_start, -1)
     previous_month_end = current_month_start - timedelta(days=1)
 
-    # Get expenses for current month
+    # Every expense that can count in the trend window: one-offs dated inside it, plus
+    # recurring expenses that started before its end and had not stopped before its start.
     result = await db.execute(
         select(Expense).where(
             and_(
                 Expense.user_id == current_user.id,
-                extract("year", Expense.date) == current_year,
-                extract("month", Expense.date) == current_month,
+                or_(
+                    Expense.date >= trend_start,
+                    and_(
+                        Expense.is_recurring.is_(True),
+                        or_(Expense.recurring_until.is_(None), Expense.recurring_until >= trend_start),
+                    ),
+                ),
+                Expense.date <= recurring.month_end(today),
             )
         )
     )
-    monthly_expenses = result.scalars().all()
+    window_expenses = result.scalars().all()
 
-    # Calculate total expenses for the month
-    total_expenses_month = sum(
-        expense.amount for expense in monthly_expenses
-    ) if monthly_expenses else Decimal("0.00")
+    def expenses_in(month: date) -> list[Expense]:
+        return [expense for expense, _ in recurring.occurrences_in_month(window_expenses, month)]
 
-    # Calculate total expenses for previous month
-    result = await db.execute(
-        select(func.sum(Expense.amount)).where(
-            and_(
-                Expense.user_id == current_user.id,
-                Expense.date >= previous_month_start,
-                Expense.date <= previous_month_end,
-            )
-        )
-    )
-    total_expenses_previous = result.scalar_one() or Decimal("0.00")
+    monthly_expenses = expenses_in(current_month_start)
+    total_expenses_month = sum((expense.amount for expense in monthly_expenses), Decimal("0.00"))
+    total_expenses_previous = sum((expense.amount for expense in expenses_in(previous_month_start)), Decimal("0.00"))
 
-    # Calculate expenses by category
-    category_totals = {}
+    category_totals: dict[str, Decimal] = {}
     for expense in monthly_expenses:
-        if expense.category in category_totals:
-            category_totals[expense.category] += expense.amount
-        else:
-            category_totals[expense.category] = expense.amount
+        category_totals[expense.category] = category_totals.get(expense.category, Decimal("0.00")) + expense.amount
 
-    # Create category summary with percentages
-    expenses_by_category = []
-    for category, total in category_totals.items():
-        percentage = calculate_percentage(total, total_expenses_month)
-        expenses_by_category.append(
-            CategorySummary(category=category, total=total, percentage=percentage)
-        )
-
-    # Sort by total descending
+    expenses_by_category = [
+        CategorySummary(category=category, total=total, percentage=calculate_percentage(total, total_expenses_month))
+        for category, total in category_totals.items()
+    ]
     expenses_by_category.sort(key=lambda x: x.total, reverse=True)
 
     # Get recent transactions (last 10)
@@ -125,39 +112,16 @@ async def get_dashboard_overview(
     )
     income_total_previous = result.scalar_one() or Decimal("0.00")
 
-    # Get wishlist total
-    result = await db.execute(
-        select(func.sum(Wishlist.price), func.count(Wishlist.id)).where(
-            Wishlist.user_id == current_user.id
+    # Monthly category spend (last 6 months including current), recurring expenses in every month they apply
+    monthly_category_spend = []
+    for offset in range(-5, 1):
+        month = shift_month(current_month_start, offset)
+        totals: dict[str, Decimal] = {}
+        for expense in expenses_in(month):
+            totals[expense.category] = totals.get(expense.category, Decimal("0.00")) + expense.amount
+        monthly_category_spend.extend(
+            MonthlyCategorySpend(month=month, category=category, total=total) for category, total in sorted(totals.items())
         )
-    )
-    wishlist_total, wishlist_count = result.one()
-
-    # Monthly category spend (last 6 months including current)
-    result = await db.execute(
-        select(
-            extract("year", Expense.date).label("year"),
-            extract("month", Expense.date).label("month"),
-            Expense.category,
-            func.sum(Expense.amount).label("total"),
-        )
-        .where(
-            and_(
-                Expense.user_id == current_user.id,
-                Expense.date >= trend_start,
-            )
-        )
-        .group_by("year", "month", Expense.category)
-        .order_by("year", "month")
-    )
-    monthly_category_spend = [
-        MonthlyCategorySpend(
-            month=date(int(row.year), int(row.month), 1),
-            category=row.category,
-            total=row.total,
-        )
-        for row in result
-    ]
 
     # Monthly income totals (last 6 months)
     result = await db.execute(
@@ -219,6 +183,4 @@ async def get_dashboard_overview(
         monthly_income=monthly_income,
         monthly_savings=monthly_savings,
         recent_transactions=recent_transactions,
-        wishlist_total=wishlist_total if wishlist_total is not None else Decimal("0.00"),
-        wishlist_count=wishlist_count if wishlist_count is not None else 0,
     )

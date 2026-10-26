@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import auth, expenses, categories, wishlist, dashboard, incomes, budgets, savings
+from app.routers import auth, expenses, categories, dashboard, incomes, savings
 
 app = FastAPI(
     title="Budget Tracker API",
@@ -28,10 +28,8 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
-app.include_router(wishlist.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(incomes.router, prefix="/api")
-app.include_router(budgets.router, prefix="/api")
 app.include_router(savings.router, prefix="/api")
 
 

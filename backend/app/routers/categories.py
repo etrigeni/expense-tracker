@@ -57,7 +57,6 @@ async def get_categories(
                 name=cat_data["name"],
                 icon=cat_data["icon"],
                 color=cat_data["color"],
-                budget_monthly=None,
                 is_custom=False,
                 user_id=None,
             )
@@ -105,7 +104,6 @@ async def create_category(
         name=category_data.name,
         icon=category_data.icon,
         color=category_data.color,
-        budget_monthly=category_data.budget_monthly,
         is_custom=True,
     )
 
@@ -169,9 +167,6 @@ async def update_category(
                 name=category_data.name if "name" in category_data.model_fields_set else default_category.name,
                 icon=category_data.icon if "icon" in category_data.model_fields_set else default_category.icon,
                 color=category_data.color if "color" in category_data.model_fields_set else default_category.color,
-                budget_monthly=category_data.budget_monthly
-                if "budget_monthly" in category_data.model_fields_set
-                else default_category.budget_monthly,
                 is_custom=True,
             )
             db.add(category)
@@ -183,8 +178,6 @@ async def update_category(
         category.icon = category_data.icon
     if "color" in category_data.model_fields_set:
         category.color = category_data.color
-    if "budget_monthly" in category_data.model_fields_set:
-        category.budget_monthly = category_data.budget_monthly
 
     await db.commit()
     await db.refresh(category)

@@ -14,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import false, func
 from app.database import Base
 
 
@@ -32,9 +32,7 @@ class User(Base):
     # Relationships
     expenses = relationship("Expense", back_populates="user", cascade="all, delete-orphan")
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
-    wishlist_items = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
     incomes = relationship("Income", back_populates="user", cascade="all, delete-orphan")
-    category_budgets = relationship("CategoryBudget", back_populates="user", cascade="all, delete-orphan")
     savings = relationship("Savings", back_populates="user", cascade="all, delete-orphan")
 
 
@@ -47,17 +45,36 @@ class Expense(Base):
     category = Column(String, nullable=False)
     date = Column(Date, nullable=False)
     description = Column(Text, nullable=True)
+    # Monthly recurring: `date` is the first occurrence, `recurring_until` the last day it applies
+    is_recurring = Column(Boolean, nullable=False, default=False, server_default=false())
+    recurring_until = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     user = relationship("User", back_populates="expenses")
+    payments = relationship("RecurringPayment", back_populates="expense", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
         Index("ix_expenses_user_date", "user_id", "date"),
         Index("ix_expenses_user_category", "user_id", "category"),
     )
+
+
+class RecurringPayment(Base):
+    """Marks a recurring expense as paid for one month (the checklist tick)."""
+
+    __tablename__ = "recurring_payments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    expense_id = Column(UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=False)
+    month = Column(Date, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    expense = relationship("Expense", back_populates="payments")
+
+    __table_args__ = (UniqueConstraint("expense_id", "month", name="uq_recurring_payment_month"),)
 
 
 class Category(Base):
@@ -70,33 +87,14 @@ class Category(Base):
     name = Column(String, nullable=False)
     icon = Column(String, nullable=False)
     color = Column(String, nullable=False)
-    budget_monthly = Column(Numeric(10, 2), nullable=True)
     is_custom = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     user = relationship("User", back_populates="categories")
-    budgets = relationship("CategoryBudget", back_populates="category", cascade="all, delete-orphan")
 
     # Constraints
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_user_category_name"),)
-
-
-class Wishlist(Base):
-    __tablename__ = "wishlist"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    item_name = Column(String, nullable=False)
-    price = Column(Numeric(10, 2), nullable=False)
-    url = Column(String, nullable=True)
-    image_url = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relationships
-    user = relationship("User", back_populates="wishlist_items")
 
 
 class Income(Base):
@@ -114,26 +112,6 @@ class Income(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", back_populates="incomes")
-
-
-class CategoryBudget(Base):
-    __tablename__ = "category_budgets"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
-    month = Column(Date, nullable=False)
-    amount = Column(Numeric(10, 2), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    user = relationship("User", back_populates="category_budgets")
-    category = relationship("Category", back_populates="budgets")
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "category_id", "month", name="uq_user_category_month_budget"),
-        Index("ix_category_budgets_user_month", "user_id", "month"),
-    )
 
 
 class Savings(Base):
