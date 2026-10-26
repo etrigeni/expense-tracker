@@ -7,7 +7,6 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
-import Wishlist from './pages/Wishlist';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -26,25 +25,10 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Toaster
-          position="top-right"
+          position="bottom-center"
           toastOptions={{
             duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
+            className: '!rounded-control !bg-ink !text-white !text-sm !shadow-lg',
           }}
         />
         <Routes>
@@ -84,17 +68,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/wishlist"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Wishlist />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

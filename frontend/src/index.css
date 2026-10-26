@@ -1,59 +1,79 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+:root {
+  color-scheme: light;
+  --canvas: 250 246 242;
+  --surface: 255 255 255;
+  --sunken: 246 239 234;
+  --line: 230 220 213;
+  --ink: 74 59 54;
+  --ink-2: 117 99 93;
+  --ink-3: 143 125 119;
+  --accent: 201 147 138;
+  --accent-soft: 248 236 232;
+  --accent-ink: 154 94 84;
+  --on-accent: 62 44 39;
+  --danger: 176 72 64;
+  --danger-soft: 249 230 227;
+  --warn: 176 126 60;
+  --hero: 243 225 218;
+  --panel-from: #f5f0ec;
+  --panel-to: #ede6e1;
+  --hero-from: #f6e6df;
+  --hero-to: #edd5cb;
+
+  /* Chart series: separated by lightness so they stay distinct for colour-blind readers */
+  --chart-income: #ead7cd;
+  --chart-spent: #b9837a;
+  --chart-grid: #f1e8e2;
+  --chart-axis: #8f7d77;
 }
 
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f8f2f0;
-  color: #5a3a36;
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent-ink ring-offset-2 ring-offset-canvas;
+  }
+
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='month']::-webkit-calendar-picker-indicator {
+    opacity: 0.6;
+    cursor: pointer;
+  }
 }
 
-#root {
-  min-height: 100vh;
+@layer utilities {
+  /* Warm gray card surface with a soft vertical fade */
+  .bg-panel {
+    background-image: linear-gradient(180deg, var(--panel-from), var(--panel-to));
+  }
+
+  .bg-hero-gradient {
+    background-image: linear-gradient(160deg, var(--hero-from), var(--hero-to));
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
-.card-surface {
-  @apply rounded-2xl border border-gray-200 bg-gradient-to-br from-purple-600/10 to-blue-600/10 shadow-lg dark:border-gray-700;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #e8d5d0;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #be8f84;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #ab776d;
-}
-
-/* Dark mode scrollbar */
-.dark ::-webkit-scrollbar-track {
-  background: #5a3a36;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: #916057;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #be8f84;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

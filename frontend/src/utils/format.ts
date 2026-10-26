@@ -1,18 +1,61 @@
-export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(amount);
+const currencyFormatter = new Intl.NumberFormat('en-GB', {
+  style: 'currency',
+  currency: 'EUR',
+});
+
+export const formatCurrency = (amount: number): string => currencyFormatter.format(amount);
+
+/** Splits a formatted amount into the whole part ("€1,234") and the fraction (".50"). */
+export const splitCurrency = (amount: number): { whole: string; fraction: string } => {
+  const parts = currencyFormatter.formatToParts(amount);
+  const fractionStart = parts.findIndex((part) => part.type === 'decimal');
+  if (fractionStart === -1) {
+    return { whole: parts.map((part) => part.value).join(''), fraction: '' };
+  }
+  return {
+    whole: parts.slice(0, fractionStart).map((part) => part.value).join(''),
+    fraction: parts.slice(fractionStart).map((part) => part.value).join(''),
+  };
 };
 
 export const formatDate = (date: string): string => {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
+  return new Date(date).toLocaleDateString('en-GB', {
     day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+export const formatDayHeading = (date: string): string => {
+  return new Date(date).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
   });
 };
 
 export const formatDateInput = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
+/** Local-time "YYYY-MM" for the current month (toISOString would use UTC). */
+export const currentMonthKey = (): string => formatDateInput(new Date()).slice(0, 7);
+
+export const todayInput = (): string => formatDateInput(new Date());
+
+export const shiftMonthKey = (month: string, delta: number): string => {
+  const [year, monthIndex] = month.split('-').map(Number);
+  return formatDateInput(new Date(year, monthIndex - 1 + delta, 1)).slice(0, 7);
+};
+
+export const monthKeyToDate = (month: string): string => `${month}-01`;
+
+export const formatMonthLabel = (month: string, style: 'long' | 'short' = 'long'): string => {
+  const [year, monthIndex] = month.split('-').map(Number);
+  return new Date(year, monthIndex - 1, 1).toLocaleString('en-GB', {
+    month: style,
+    year: style === 'long' ? 'numeric' : '2-digit',
+  });
 };

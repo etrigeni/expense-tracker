@@ -1,16 +1,17 @@
 # Budget Tracker - Personal Finance Management App
 
-A modern, full-stack web application for tracking expenses, managing wishlists, and monitoring your budget. Built with FastAPI (Python) backend and React (TypeScript) frontend.
+A full-stack web application for tracking expenses and monthly bills. Built with FastAPI (Python) backend and React (TypeScript) frontend.
 
 ## Features
 
 - **User Authentication** - Secure JWT-based authentication with password hashing
 - **Expense Tracking** - Add, edit, delete, and filter expenses by category and date
 - **Category Management** - Pre-set categories with ability to create custom ones
-- **Wishlist** - Track items you want to buy and mark them as purchased
-- **Dashboard** - Visual overview with charts and statistics
+- **Overview** - What is left to spend this month, spending by category, and a 6-month trend
+- **Quick add** - Add an expense from any page, with one-tap shortcuts for your most-used categories
+- **Monthly bills** - Mark an expense as repeating every month; it counts in every month until stopped, with a checklist to tick off what you've paid
 - **Responsive Design** - Works beautifully on desktop, tablet, and mobile
-- **Smooth Animations** - Polished UI with Framer Motion animations
+- **Light and dark mode** - Follows your system setting
 
 ## Tech Stack
 
@@ -162,10 +163,10 @@ Frontend will be running at `http://localhost:5173`
 
 1. **Register a new account** at `/register`
 2. **Login** with your credentials at `/login`
-3. **Navigate to Dashboard** to see your expense overview
-4. **Add expenses** in the Expenses page
-5. **Create wishlist items** in the Wishlist page
-6. **Manage categories** in the Categories page
+3. **Overview** shows what is left this month; add income with **Manage**
+4. **Add expense** (top right, or the + button on mobile) logs a purchase
+5. Turn on **Repeats every month** for rent, subscriptions and bills, then tick them off in **Monthly bills**
+6. **Expenses** lists the month's transactions and bills
 
 ## API Endpoints
 
@@ -177,7 +178,9 @@ Frontend will be running at `http://localhost:5173`
 - `POST /api/auth/password-reset/confirm` - Confirm password reset
 
 ### Expenses
-- `GET /api/expenses/` - Get all expenses (with filters)
+- `GET /api/expenses/` - Get all expenses (with filters); `?month=YYYY-MM-DD` returns that month with recurring expenses included
+- `GET /api/expenses/recurring` - Recurring expenses that still apply
+- `PUT /api/expenses/{id}/paid` - Tick or untick a recurring expense as paid for a month
 - `POST /api/expenses/` - Create expense
 - `GET /api/expenses/stats` - Get expense statistics
 - `GET /api/expenses/{id}` - Get single expense
@@ -189,15 +192,6 @@ Frontend will be running at `http://localhost:5173`
 - `POST /api/categories/` - Create custom category
 - `PUT /api/categories/{id}` - Update category
 - `DELETE /api/categories/{id}` - Delete category
-
-### Wishlist
-- `GET /api/wishlist/` - Get all wishlist items
-- `POST /api/wishlist/` - Create wishlist item
-- `GET /api/wishlist/total` - Get wishlist total
-- `GET /api/wishlist/{id}` - Get single item
-- `PUT /api/wishlist/{id}` - Update item
-- `DELETE /api/wishlist/{id}` - Delete item
-- `POST /api/wishlist/{id}/purchase` - Mark as purchased
 
 ### Dashboard
 - `GET /api/dashboard/overview` - Get dashboard summary
@@ -260,8 +254,6 @@ npm run lint
 
 ## Future Enhancements
 
-- Budget limits per category
-- Recurring expenses
 - Expense reports and analytics
 - Receipt uploads
 - Multi-currency support
