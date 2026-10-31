@@ -3,37 +3,40 @@ import { ChevronLeft, ChevronRight, Pencil, Plus, Repeat, Trash2, X } from 'luci
 import toast from 'react-hot-toast';
 import { expenseService } from '@/services/expenseService';
 import { categoryService } from '@/services/categoryService';
-import type { Category, Expense, ExpenseCreate } from '@/types';
+import { periodService } from '@/services/periodService';
+import type { Category, Expense, ExpenseCreate, PayPeriod } from '@/types';
 import {
-  currentMonthKey,
   formatCurrency,
-  formatDateInput,
   formatDayHeading,
   formatMonthLabel,
+  formatPeriodRange,
   monthKeyToDate,
   shiftMonthKey,
 } from '@/utils/format';
 import { CategoryIcon } from '@/utils/categories';
-import { Button, ConfirmDialog, EmptyState, IconButton, Input, Money, PageHeader, Panel, Select } from '@/components/ui';
+import { Button, ConfirmDialog, EmptyState, IconButton, Input, Money, PageHeader, Panel, Select, Spinner } from '@/components/ui';
 import ExpenseForm from '@/components/ExpenseForm';
 import BillsChecklist from '@/components/BillsChecklist';
 import { notifyExpensesChanged, useExpensesChanged, useQuickAdd } from '@/components/QuickAdd';
 
-const lastDayOfMonth = (month: string) => {
-  const [year, monthIndex] = month.split('-').map(Number);
-  return formatDateInput(new Date(year, monthIndex, 0));
-};
-
-const MonthSwitcher: React.FC<{ month: string; onChange: (month: string) => void }> = ({ month, onChange }) => {
-  const isCurrent = month === currentMonthKey();
+/** Steps through pay periods. Each is named after a month and shows its real dates underneath. */
+const PeriodSwitcher: React.FC<{
+  month: string;
+  period: PayPeriod | null;
+  isCurrent: boolean;
+  onChange: (month: string) => void;
+}> = ({ month, period, isCurrent, onChange }) => {
   return (
-    <div className="flex items-center gap-1 rounded-control border border-line bg-surface p-0.5">
-      <IconButton label="Previous month" onClick={() => onChange(shiftMonthKey(month, -1))}>
+    <div className="flex w-full items-center gap-1 rounded-control border border-line bg-surface p-0.5 sm:w-auto">
+      <IconButton label="Previous period" onClick={() => onChange(shiftMonthKey(month, -1))}>
         <ChevronLeft className="h-4 w-4" />
       </IconButton>
-      <span className="min-w-[8.5rem] text-center text-sm font-medium text-ink">{formatMonthLabel(month)}</span>
+      <span className="flex min-w-[9rem] flex-1 flex-col items-center leading-tight">
+        <span className="text-sm font-medium text-ink">{formatMonthLabel(month)}</span>
+        <span className="text-xs text-ink-3">{period ? formatPeriodRange(period.start, period.end) : '\u00a0'}</span>
+      </span>
       <IconButton
-        label="Next month"
+        label="Next period"
         onClick={() => onChange(shiftMonthKey(month, 1))}
         disabled={isCurrent}
         className="disabled:opacity-30 disabled:hover:bg-transparent"
@@ -47,7 +50,9 @@ const MonthSwitcher: React.FC<{ month: string; onChange: (month: string) => void
 const Expenses: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [month, setMonth] = useState(currentMonthKey());
+  const [currentMonth, setCurrentMonth] = useState('');
+  const [month, setMonth] = useState('');
+  const [period, setPeriod] = useState<PayPeriod | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -69,13 +74,29 @@ const Expenses: React.FC = () => {
       .getCategories()
       .then(setCategories)
       .catch(() => toast.error('Could not load categories.'));
+    periodService
+      .getCurrent()
+      .then((current) => {
+        const key = current.month.slice(0, 7);
+        setCurrentMonth(key);
+        setMonth(key);
+      })
+      .catch(() => toast.error('Could not load the current pay period.'));
   }, []);
 
   useEffect(() => {
+    if (!month) return;
+    setPeriod(null);
     loadExpenses(month);
+    periodService
+      .getPeriod(monthKeyToDate(month))
+      .then(setPeriod)
+      .catch(() => toast.error('Could not load the pay period.'));
   }, [month]);
 
-  useExpensesChanged(() => loadExpenses());
+  useExpensesChanged(() => {
+    if (month) loadExpenses();
+  });
 
   const bills = useMemo(() => expenses.filter((expense) => expense.is_recurring), [expenses]);
   const totalSpent = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
@@ -130,9 +151,9 @@ const Expenses: React.FC = () => {
   };
 
   const handleStop = async () => {
-    if (!toStop) return;
+    if (!toStop || !period) return;
     try {
-      await expenseService.updateExpense(toStop.id, { recurring_until: lastDayOfMonth(month) });
+      await expenseService.updateExpense(toStop.id, { recurring_until: period.end });
       setToStop(null);
       notifyExpensesChanged();
       toast.success(`${toStop.description || toStop.category} stops after ${monthName}.`);
@@ -153,28 +174,32 @@ const Expenses: React.FC = () => {
     }
   };
 
+  if (!month) {
+    return <Spinner />;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Expenses">
-        <MonthSwitcher month={month} onChange={setMonth} />
+        <PeriodSwitcher month={month} period={period} isCurrent={month === currentMonth} onChange={setMonth} />
       </PageHeader>
 
       <Panel as="div" className="grid grid-cols-3 divide-x divide-line">
-        <div className="p-4 sm:p-5">
-          <p className="text-sm text-ink-3">Spent</p>
-          <p className="mt-1 text-xl font-semibold sm:text-2xl">
+        <div className="min-w-0 p-3 sm:p-5">
+          <p className="text-xs text-ink-3 sm:text-sm">Spent</p>
+          <p className="mt-1 text-lg font-semibold sm:text-2xl">
             <Money amount={totalSpent} />
           </p>
         </div>
-        <div className="p-4 sm:p-5">
-          <p className="text-sm text-ink-3">Monthly bills</p>
-          <p className="mt-1 text-xl font-semibold sm:text-2xl">
+        <div className="min-w-0 p-3 sm:p-5">
+          <p className="text-xs text-ink-3 sm:text-sm">Bills</p>
+          <p className="mt-1 text-lg font-semibold sm:text-2xl">
             <Money amount={billsTotal} />
           </p>
         </div>
-        <div className="p-4 sm:p-5">
-          <p className="text-sm text-ink-3">Everything else</p>
-          <p className="mt-1 text-xl font-semibold sm:text-2xl">
+        <div className="min-w-0 p-3 sm:p-5">
+          <p className="text-xs text-ink-3 sm:text-sm">Other spending</p>
+          <p className="mt-1 text-lg font-semibold sm:text-2xl">
             <Money amount={totalSpent - billsTotal} />
           </p>
         </div>
@@ -255,18 +280,18 @@ const Expenses: React.FC = () => {
                   </div>
                   <ul className="divide-y divide-line">
                     {group.items.map((expense) => (
-                      <li key={expense.id} className="group flex items-center gap-3 px-5 py-3">
+                      <li key={`${expense.id}-${expense.date}`} className="group flex items-center gap-3 px-5 py-3">
                         <CategoryIcon name={expense.category} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-ink">
                             {expense.description || expense.category}
                           </p>
                           <p className="flex items-center gap-1.5 truncate text-xs text-ink-3">
-                            {expense.description ? expense.category : null}
+                            {expense.description ? <span className="truncate">{expense.category}</span> : null}
                             {expense.is_recurring ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-accent-ink">
-                                <Repeat className="h-3 w-3" />
-                                Monthly
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-accent-ink">
+                                <Repeat className="h-3 w-3" aria-label="Monthly" />
+                                <span className="hidden sm:inline">Monthly</span>
                               </span>
                             ) : null}
                           </p>

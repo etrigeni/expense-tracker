@@ -35,6 +35,11 @@
 
 
 @layer base {
+  html {
+    scroll-padding-top: 4.5rem;
+    scroll-padding-bottom: 6rem;
+  }
+
   body {
     @apply bg-canvas font-sans text-ink antialiased;
   }
