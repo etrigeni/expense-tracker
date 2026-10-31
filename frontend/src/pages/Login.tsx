@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { authService } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,14 +31,6 @@ const Login: React.FC = () => {
     <AuthShell
       title="Log in"
       subtitle="See where your money went this month."
-      footer={
-        <>
-          New here?{' '}
-          <Link to="/register" className="font-medium text-accent-ink hover:underline">
-            Create an account
-          </Link>
-        </>
-      }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Email">

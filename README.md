@@ -161,8 +161,10 @@ Frontend will be running at `http://localhost:5173`
 
 ## Usage
 
-1. **Register a new account** at `/register`
-2. **Login** with your credentials at `/login`
+1. **Create your account** (sign-up is closed; this is a single-user app):
+   `cd backend && uv run python -m app.manage set-password you@example.com --name "Your Name"`.
+   Run the same command to set a new password if you forget it.
+2. **Log in** at `/login`
 3. **Overview** shows what is left this month; add income with **Manage**
 4. **Add expense** (top right, or the + button on mobile) logs a purchase
 5. Turn on **Repeats every month** for rent, subscriptions and bills, then tick them off in **Monthly bills**
@@ -171,11 +173,8 @@ Frontend will be running at `http://localhost:5173`
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login and get JWT tokens
 - `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/password-reset` - Request password reset
-- `POST /api/auth/password-reset/confirm` - Confirm password reset
 
 ### Expenses
 - `GET /api/expenses/` - Get all expenses (with filters); `?month=YYYY-MM-DD` returns that month with recurring expenses included
