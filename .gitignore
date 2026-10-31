@@ -1,0 +1,2 @@
+# Local secrets at the repo root, e.g. .env.render with the Render API key
+/.env*
