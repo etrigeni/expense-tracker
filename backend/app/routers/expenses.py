@@ -7,9 +7,16 @@ from decimal import Decimal
 import uuid
 from app.database import get_db
 from app.models import User, Expense, RecurringPayment, Trip
-from app.schemas import ExpenseCreate, ExpenseResponse, ExpenseStats, ExpenseUpdate, RecurringPaymentUpdate
+from app.schemas import (
+    CategoryPeriodTotal,
+    ExpenseCreate,
+    ExpenseResponse,
+    ExpenseStats,
+    ExpenseUpdate,
+    RecurringPaymentUpdate,
+)
 from app.dependencies import get_current_user
-from app.periods import period_bounds, period_for
+from app.periods import period_bounds, period_for, shift_month
 from app.recurring import occurrences_in_period
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -92,6 +99,49 @@ async def get_expenses(
     query = query.order_by(Expense.date.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@router.get("/history", response_model=list[CategoryPeriodTotal])
+async def category_history(
+    category: str,
+    month: date = Query(..., description="Label of the last pay period to include (any day in that month)"),
+    periods: int = Query(12, ge=1, le=24),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """What was spent in one category in each of the last `periods` pay periods, oldest first."""
+    last = month.replace(day=1)
+    labels = [shift_month(last, offset) for offset in range(-(periods - 1), 1)]
+    bounds = [period_bounds(label) for label in labels]
+    window_start, window_end = bounds[0][0], bounds[-1][1]
+
+    result = await db.execute(
+        select(Expense).where(
+            and_(
+                Expense.user_id == current_user.id,
+                Expense.category == category,
+                Expense.date <= window_end,
+                or_(
+                    Expense.date >= window_start,
+                    and_(
+                        Expense.is_recurring.is_(True),
+                        or_(Expense.recurring_until.is_(None), Expense.recurring_until >= window_start),
+                    ),
+                ),
+            )
+        )
+    )
+    expenses = result.scalars().all()
+
+    return [
+        CategoryPeriodTotal(
+            month=label,
+            start=start,
+            end=end,
+            total=sum((expense.amount for expense, _ in occurrences_in_period(expenses, start, end)), Decimal("0.00")),
+        )
+        for label, (start, end) in zip(labels, bounds)
+    ]
 
 
 @router.get("/recurring", response_model=list[ExpenseResponse])

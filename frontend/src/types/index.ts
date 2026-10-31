@@ -169,3 +169,11 @@ export interface TripCreate {
   start_date: string;
   end_date: string;
 }
+
+/** What one category cost in a pay period. */
+export interface CategoryPeriodTotal {
+  month: string;
+  start: string;
+  end: string;
+  total: number;
+}

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Pencil, Plane, Plus, Repeat, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { expenseService } from '@/services/expenseService';
@@ -18,6 +19,7 @@ import { CategoryIcon } from '@/utils/categories';
 import { Button, ConfirmDialog, EmptyState, IconButton, Input, Money, PageHeader, Panel, Select, Spinner } from '@/components/ui';
 import ExpenseForm from '@/components/ExpenseForm';
 import BillsChecklist from '@/components/BillsChecklist';
+import CategoryHistory from '@/components/CategoryHistory';
 import { notifyExpensesChanged, useExpensesChanged, useQuickAdd } from '@/components/QuickAdd';
 
 /** Steps through pay periods. Each is named after a month and shows its real dates underneath. */
@@ -55,7 +57,10 @@ const Expenses: React.FC = () => {
   const [month, setMonth] = useState('');
   const [period, setPeriod] = useState<PayPeriod | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [searchParams] = useSearchParams();
+  // A category can be opened directly, e.g. from "Where it went" on the Overview
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') ?? '');
+  const [historyRefresh, setHistoryRefresh] = useState(0);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Expense | null>(null);
   const [toDelete, setToDelete] = useState<Expense | null>(null);
@@ -101,7 +106,9 @@ const Expenses: React.FC = () => {
   }, [month]);
 
   useExpensesChanged(() => {
-    if (month) loadExpenses();
+    if (!month) return;
+    loadExpenses();
+    setHistoryRefresh((value) => value + 1);
   });
 
   const tripNames = useMemo(() => new Map(trips.map((trip) => [trip.id, trip.name])), [trips]);
@@ -191,6 +198,16 @@ const Expenses: React.FC = () => {
         <PeriodSwitcher month={month} period={period} isCurrent={month === currentMonth} onChange={setMonth} />
       </PageHeader>
 
+      {categoryFilter ? (
+        <CategoryHistory
+          category={categoryFilter}
+          month={month}
+          onSelectMonth={setMonth}
+          onClose={() => setCategoryFilter('')}
+          refreshKey={historyRefresh}
+        />
+      ) : null}
+
       <Panel as="div" className="grid grid-cols-3 divide-x divide-line">
         <div className="min-w-0 p-3 sm:p-5">
           <p className="text-xs text-ink-3 sm:text-sm">Spent</p>
@@ -220,6 +237,7 @@ const Expenses: React.FC = () => {
         onEdit={setEditing}
         onStop={setToStop}
       />
+
 
       <section className="space-y-4" aria-label="Transactions">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
