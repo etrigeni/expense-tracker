@@ -1,22 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDownRight, ArrowUpRight, Plus } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ChevronRight, Plane, Plus } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import toast from 'react-hot-toast';
 import { dashboardService } from '@/services/dashboardService';
 import { incomeService } from '@/services/incomeService';
 import { savingsService } from '@/services/savingsService';
 import { expenseService } from '@/services/expenseService';
-import type { DashboardOverview, Expense, Income } from '@/types';
+import { tripService } from '@/services/tripService';
+import type { DashboardOverview, Expense, Income, Trip } from '@/types';
 import {
   formatCurrency,
   formatDate,
   formatMonthLabel,
   formatPeriodRange,
+  todayInput,
+  tripOn,
   monthKeyToDate,
   shiftMonthKey,
 } from '@/utils/format';
-import { CategoryIcon, categoryStyle } from '@/utils/categories';
+import { CategoryIcon, categoryStyle, isRetiredCategory } from '@/utils/categories';
 import { Button, EmptyState, Input, Money, Panel, PanelHeader, Spinner } from '@/components/ui';
 import { ChartTooltip, LegendItem, useChartTheme } from '@/components/charts';
 import IncomeManager from '@/components/IncomeManager';
@@ -55,6 +58,7 @@ const Dashboard: React.FC = () => {
   const [savingsDraft, setSavingsDraft] = useState('');
   const [savingSavings, setSavingSavings] = useState(false);
   const [bills, setBills] = useState<Expense[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const chart = useChartTheme();
   const openQuickAdd = useQuickAdd();
 
@@ -110,9 +114,18 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const loadTrips = async () => {
+    try {
+      setTrips(await tripService.getTrips());
+    } catch (error) {
+      toast.error('Could not load trips.');
+    }
+  };
+
   useEffect(() => {
     loadOverview();
     loadIncomes();
+    loadTrips();
   }, []);
 
   useEffect(() => {
@@ -124,6 +137,7 @@ const Dashboard: React.FC = () => {
   useExpensesChanged(() => {
     loadOverview();
     loadBills();
+    loadTrips();
   });
 
   const handleSaveSavings = async (event: React.FormEvent) => {
@@ -181,6 +195,7 @@ const Dashboard: React.FC = () => {
       totals.set(entry.category, (totals.get(entry.category) ?? 0) + Number(entry.total));
     });
     return Array.from(totals.entries())
+      .filter(([category]) => !isRetiredCategory(category))
       .sort((a, b) => b[1] - a[1])
       .slice(0, SHORTCUT_COUNT)
       .map(([category]) => category);
@@ -190,6 +205,7 @@ const Dashboard: React.FC = () => {
     return <Spinner />;
   }
 
+  const activeTrip = tripOn(trips, todayInput());
   const spent = Number(overview?.total_expenses_month ?? 0);
   const income = Number(overview?.income_total_month ?? 0);
   const balance = Number(overview?.net_balance_month ?? income - spent);
@@ -205,6 +221,24 @@ const Dashboard: React.FC = () => {
         {greeting()}. Here is {monthName} so far
         {overview ? ` (${formatPeriodRange(overview.period_start, overview.period_end)})` : ''}.
       </p>
+
+      {activeTrip ? (
+        <Link
+          to={`/trips/${activeTrip.id}`}
+          className="flex items-center gap-3 rounded-panel border border-line bg-panel px-4 py-3 transition-colors hover:border-accent"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-[#dde3d5] text-[#6c7563]">
+            <Plane className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm">
+            <span className="block truncate font-medium text-ink">You're on your {activeTrip.name} trip</span>
+            <span className="block text-ink-3">
+              {formatCurrency(Number(activeTrip.total))} spent so far. New expenses go to this trip.
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-ink-3" />
+        </Link>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
         <section className="relative overflow-hidden rounded-panel bg-hero bg-hero-gradient p-6 text-ink sm:p-8">

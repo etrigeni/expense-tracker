@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { KeyRound, LayoutDashboard, LogOut, Plus, Receipt } from 'lucide-react';
+import { KeyRound, LayoutDashboard, LogOut, Plane, Plus, Receipt } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { QuickAddProvider, useQuickAdd } from './QuickAdd';
 import ChangePasswordDialog from './ChangePasswordDialog';
@@ -8,6 +8,7 @@ import ChangePasswordDialog from './ChangePasswordDialog';
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
   { path: '/expenses', icon: Receipt, label: 'Expenses' },
+  { path: '/trips', icon: Plane, label: 'Trips' },
 ];
 
 export const Wordmark: React.FC = () => (

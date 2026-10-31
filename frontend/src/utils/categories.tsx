@@ -75,9 +75,12 @@ export const categoryGroups: { title: string; names: string[] }[] = [
 
 const retiredCategories = new Set(['Bills', 'Activities', 'Savings']);
 
+/** Kept only so older expenses keep their category; not offered for new ones. */
+export const isRetiredCategory = (name: string) => retiredCategories.has(name);
+
 /**
  * Categories to offer in the picker, grouped. Retired ones are left out unless `keep`
- * names one (the category of the expense being edited).
+ * names one (the category already selected).
  */
 export const groupCategories = (all: Category[], keep?: string) => {
   const byName = new Map(all.map((category) => [category.name, category]));

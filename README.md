@@ -9,6 +9,7 @@ A full-stack web application for tracking expenses and monthly bills. Built with
 - **Categories** - Grouped presets (Home & bills, Everyday, Car, Health & you, Fun & life, Other), e.g. Rent, Electricity, Water, Internet, Mobile, Fuel, Gifts
 - **Overview** - What is left to spend this month, spending by category, and a 6-month trend
 - **Quick add** - Add an expense from any page, with one-tap shortcuts for your most-used categories
+- **Trips** - Create a trip with dates; expenses dated during it are added to it automatically, with a total and breakdown per trip (they still count in the pay period too)
 - **Monthly bills** - Mark an expense as repeating every month; it counts in every month until stopped, with a checklist to tick off what you've paid
 - **Responsive Design** - Works beautifully on desktop, tablet, and mobile
 - **Light and dark mode** - Follows your system setting
@@ -195,6 +196,11 @@ Frontend will be running at `http://localhost:5173`
 - `POST /api/categories/` - Create custom category
 - `PUT /api/categories/{id}` - Update category
 - `DELETE /api/categories/{id}` - Delete category
+
+### Trips
+- `GET /api/trips/`, `POST /api/trips/` - List (with totals) and create trips
+- `GET|PUT|DELETE /api/trips/{id}` - One trip; deleting keeps its expenses
+- `GET /api/expenses/?trip_id={id}` - A trip's expenses
 
 ### Dashboard
 - `GET /api/dashboard/overview` - Get dashboard summary

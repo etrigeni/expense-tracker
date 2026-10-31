@@ -6,13 +6,22 @@ from datetime import date
 from decimal import Decimal
 import uuid
 from app.database import get_db
-from app.models import User, Expense, RecurringPayment
+from app.models import User, Expense, RecurringPayment, Trip
 from app.schemas import ExpenseCreate, ExpenseResponse, ExpenseStats, ExpenseUpdate, RecurringPaymentUpdate
 from app.dependencies import get_current_user
 from app.periods import period_bounds, period_for
 from app.recurring import occurrences_in_period
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
+
+
+async def check_trip(trip_id: uuid.UUID | None, user: User, db: AsyncSession) -> None:
+    """Reject a trip_id that isn't one of the user's trips."""
+    if trip_id is None:
+        return
+    result = await db.execute(select(Trip.id).where(and_(Trip.id == trip_id, Trip.user_id == user.id)))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Trip not found")
 
 
 def as_occurrence(expense: Expense, on: date, paid_ids: set[uuid.UUID]) -> ExpenseResponse:
@@ -31,6 +40,7 @@ async def get_expenses(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     category: Optional[str] = None,
+    trip_id: Optional[uuid.UUID] = Query(None, description="Only this trip's expenses (not paged)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -40,6 +50,10 @@ async def get_expenses(
     query = select(Expense).where(Expense.user_id == current_user.id)
     if category:
         query = query.where(Expense.category == category)
+
+    if trip_id:
+        result = await db.execute(query.where(Expense.trip_id == trip_id).order_by(Expense.date.desc()))
+        return result.scalars().all()
 
     if month:
         label = month.replace(day=1)
@@ -108,6 +122,7 @@ async def create_expense(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new expense"""
+    await check_trip(expense_data.trip_id, current_user, db)
     new_expense = Expense(
         user_id=current_user.id,
         amount=expense_data.amount,
@@ -116,6 +131,7 @@ async def create_expense(
         description=expense_data.description,
         is_recurring=expense_data.is_recurring,
         recurring_until=expense_data.recurring_until if expense_data.is_recurring else None,
+        trip_id=expense_data.trip_id,
     )
 
     db.add(new_expense)
@@ -237,7 +253,10 @@ async def update_expense(
             detail="Expense not found",
         )
 
-    for field, value in expense_data.model_dump(exclude_unset=True).items():
+    changes = expense_data.model_dump(exclude_unset=True)
+    if "trip_id" in changes:
+        await check_trip(changes["trip_id"], current_user, db)
+    for field, value in changes.items():
         setattr(expense, field, value)
     if not expense.is_recurring:
         expense.recurring_until = None

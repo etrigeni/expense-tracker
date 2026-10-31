@@ -62,3 +62,7 @@ export const formatPeriodRange = (start: string, end: string): string => {
   const short = (value: string) => new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   return `${short(start)} to ${short(end)}`;
 };
+
+/** The trip (if any) whose dates include `date` (YYYY-MM-DD). */
+export const tripOn = <T extends { start_date: string; end_date: string }>(trips: T[], date: string): T | undefined =>
+  trips.find((trip) => trip.start_date <= date && date <= trip.end_date);

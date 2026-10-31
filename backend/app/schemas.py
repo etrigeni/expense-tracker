@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
 from typing import Optional
 from datetime import date, datetime
 from datetime import date as DateType  # a field named `date` shadows the type inside schema classes
@@ -29,6 +29,7 @@ class ExpenseBase(BaseModel):
     description: Optional[str] = None
     is_recurring: bool = False
     recurring_until: Optional[DateType] = None
+    trip_id: Optional[uuid.UUID] = None
 
 
 class ExpenseCreate(ExpenseBase):
@@ -42,6 +43,7 @@ class ExpenseUpdate(BaseModel):
     description: Optional[str] = None
     is_recurring: Optional[bool] = None
     recurring_until: Optional[DateType] = None
+    trip_id: Optional[uuid.UUID] = None
 
 
 class ExpenseResponse(ExpenseBase):
@@ -54,6 +56,32 @@ class ExpenseResponse(ExpenseBase):
     paid: Optional[bool] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Trip Schemas
+class TripBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    start_date: DateType
+    end_date: DateType
+
+    @model_validator(mode="after")
+    def end_not_before_start(self):
+        if self.end_date < self.start_date:
+            raise ValueError("The trip can't end before it starts")
+        return self
+
+
+class TripCreate(TripBase):
+    pass
+
+
+class TripResponse(TripBase):
+    id: uuid.UUID
+    total: Decimal = Decimal("0.00")
+    expense_count: int = 0
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

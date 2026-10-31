@@ -34,6 +34,7 @@ class User(Base):
     categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
     incomes = relationship("Income", back_populates="user", cascade="all, delete-orphan")
     savings = relationship("Savings", back_populates="user", cascade="all, delete-orphan")
+    trips = relationship("Trip", back_populates="user", cascade="all, delete-orphan")
 
 
 class Expense(Base):
@@ -48,11 +49,13 @@ class Expense(Base):
     # Monthly recurring: `date` is the first occurrence, `recurring_until` the last day it applies
     is_recurring = Column(Boolean, nullable=False, default=False, server_default=false())
     recurring_until = Column(Date, nullable=True)
+    trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     user = relationship("User", back_populates="expenses")
+    trip = relationship("Trip", back_populates="expenses")
     payments = relationship("RecurringPayment", back_populates="expense", cascade="all, delete-orphan")
 
     # Indexes
@@ -60,6 +63,23 @@ class Expense(Base):
         Index("ix_expenses_user_date", "user_id", "date"),
         Index("ix_expenses_user_category", "user_id", "category"),
     )
+
+
+class Trip(Base):
+    """A trip groups the expenses made on it. Expenses still count in their pay period too."""
+
+    __tablename__ = "trips"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", back_populates="trips")
+    expenses = relationship("Expense", back_populates="trip", passive_deletes=True)
 
 
 class RecurringPayment(Base):
