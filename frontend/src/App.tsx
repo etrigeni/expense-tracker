@@ -6,6 +6,8 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
+import Trips from './pages/Trips';
+import TripDetail from './pages/TripDetail';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -55,6 +57,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Expenses />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trips"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Trips />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trips/:tripId"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TripDetail />
                 </Layout>
               </ProtectedRoute>
             }

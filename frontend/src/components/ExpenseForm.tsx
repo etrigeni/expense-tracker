@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Repeat } from 'lucide-react';
+import { Plane, Repeat } from 'lucide-react';
 import toast from 'react-hot-toast';
-import type { Category, Expense, ExpenseCreate } from '@/types';
-import { formatDateInput, todayInput } from '@/utils/format';
-import { categoryStyle } from '@/utils/categories';
+import type { Category, Expense, ExpenseCreate, Trip } from '@/types';
+import { formatDateInput, todayInput, tripOn } from '@/utils/format';
+import { categoryStyle, groupCategories } from '@/utils/categories';
 import { Button, Field, Input, Modal, ModalActions } from './ui';
 
 type ExpenseFormState = {
@@ -12,6 +12,7 @@ type ExpenseFormState = {
   date: string;
   description: string;
   is_recurring: boolean;
+  trip_id: string | null;
 };
 
 const yesterdayInput = () => {
@@ -20,23 +21,48 @@ const yesterdayInput = () => {
   return formatDateInput(date);
 };
 
-/** Add or edit an expense. `expense` null means a new one. */
+/** Trips worth offering: not over for more than a month, plus the one already chosen. */
+const tripsToOffer = (trips: Trip[], selected: string | null) => {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 31);
+  const since = formatDateInput(cutoff);
+  return trips.filter((trip) => trip.end_date >= since || trip.id === selected);
+};
+
+/**
+ * Add or edit an expense. `expense` null means a new one. A new expense joins the trip whose
+ * dates include its date, until a trip is picked or cleared by hand.
+ */
 const ExpenseForm: React.FC<{
   open: boolean;
   expense: Expense | null;
   categories: Category[];
   defaultCategory?: string;
   defaultRecurring?: boolean;
+  trips?: Trip[];
+  defaultTripId?: string | null;
   onClose: () => void;
   onSubmit: (payload: ExpenseCreate) => Promise<void>;
-}> = ({ open, expense, categories, defaultCategory = '', defaultRecurring = false, onClose, onSubmit }) => {
+}> = ({
+  open,
+  expense,
+  categories,
+  defaultCategory = '',
+  defaultRecurring = false,
+  trips = [],
+  defaultTripId = null,
+  onClose,
+  onSubmit,
+}) => {
   const [form, setForm] = useState<ExpenseFormState>({
     amount: '',
     category: '',
     date: '',
     description: '',
     is_recurring: false,
+    trip_id: null,
   });
+  const [tripChosen, setTripChosen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -50,10 +76,25 @@ const ExpenseForm: React.FC<{
             date: expense.start_date ?? expense.date,
             description: expense.description ?? '',
             is_recurring: expense.is_recurring,
+            trip_id: expense.trip_id ?? null,
           }
-        : { amount: '', category: defaultCategory, date: todayInput(), description: '', is_recurring: defaultRecurring }
+        : {
+            amount: '',
+            category: defaultCategory,
+            date: todayInput(),
+            description: '',
+            is_recurring: defaultRecurring,
+            trip_id: defaultTripId,
+          }
     );
-  }, [open, expense, defaultCategory, defaultRecurring]);
+    setTripChosen(Boolean(expense) || Boolean(defaultTripId));
+  }, [open, expense, defaultCategory, defaultRecurring, defaultTripId]);
+
+  // Follow the date into a trip until the trip is set by hand
+  useEffect(() => {
+    if (!open || tripChosen || !form.date) return;
+    setForm((prev) => ({ ...prev, trip_id: tripOn(trips, prev.date)?.id ?? null }));
+  }, [open, tripChosen, form.date, trips]);
 
   const update = (patch: Partial<ExpenseFormState>) => setForm((prev) => ({ ...prev, ...patch }));
 
@@ -75,6 +116,7 @@ const ExpenseForm: React.FC<{
         date: form.date || todayInput(),
         description: form.description.trim() || undefined,
         is_recurring: form.is_recurring,
+        trip_id: form.trip_id,
       });
     } finally {
       setSaving(false);
@@ -108,30 +150,37 @@ const ExpenseForm: React.FC<{
 
         <fieldset>
           <legend className="mb-2 text-sm font-medium text-ink-2">Category</legend>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-            {categories.map((category) => {
-              const { icon: Icon, chip } = categoryStyle(category.name);
-              const selected = form.category === category.name;
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => update({ category: category.name })}
-                  className={`flex flex-col items-center gap-1.5 rounded-control border px-1 py-2.5 text-xs font-medium transition-colors ${
-                    selected
-                      ? 'border-accent bg-accent-soft text-ink ring-1 ring-accent'
-                      : 'border-line text-ink-2 hover:border-ink-3/40 hover:bg-sunken'
-                  }`}
-                >
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${chip}`} aria-hidden="true">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="line-clamp-2 w-full break-words text-center leading-tight">{category.name}</span>
-                </button>
-              );
-            })}
+          <div className="space-y-3">
+            {groupCategories(categories, form.category).map((group) => (
+              <div key={group.title}>
+                <p className="mb-1.5 text-xs text-ink-3">{group.title}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.categories.map((category) => {
+                    const { icon: Icon, chip } = categoryStyle(category.name);
+                    const selected = form.category === category.name;
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => update({ category: category.name })}
+                        className={`inline-flex h-10 items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-sm transition-colors ${
+                          selected
+                            ? 'border-accent bg-accent-soft font-medium text-ink ring-1 ring-accent'
+                            : 'border-line text-ink-2 hover:border-ink-3/40 hover:bg-sunken'
+                        }`}
+                      >
+                        <span className={`flex h-7 w-7 items-center justify-center rounded-full ${chip}`} aria-hidden="true">
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        {category.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </fieldset>
 
@@ -169,6 +218,37 @@ const ExpenseForm: React.FC<{
             </div>
           </div>
         </div>
+
+        {tripsToOffer(trips, form.trip_id).length > 0 ? (
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-ink-2">Trip</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[null, ...tripsToOffer(trips, form.trip_id)].map((trip) => {
+                const selected = form.trip_id === (trip?.id ?? null);
+                return (
+                  <button
+                    key={trip?.id ?? 'none'}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => {
+                      setTripChosen(true);
+                      update({ trip_id: trip?.id ?? null });
+                    }}
+                    className={`inline-flex h-10 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors ${
+                      selected
+                        ? 'border-accent bg-accent-soft font-medium text-ink ring-1 ring-accent'
+                        : 'border-line text-ink-2 hover:bg-sunken'
+                    }`}
+                  >
+                    {trip ? <Plane className="h-3.5 w-3.5" /> : null}
+                    {trip ? trip.name : 'No trip'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         <label className="flex cursor-pointer items-center justify-between gap-4 rounded-control border border-line bg-sunken/60 px-4 py-3">
           <span>

@@ -1,5 +1,5 @@
 import api from './api';
-import { Expense, ExpenseCreate, ExpenseUpdate, ExpenseStats } from '@/types';
+import { CategoryPeriodTotal, Expense, ExpenseCreate, ExpenseUpdate, ExpenseStats } from '@/types';
 
 export const expenseService = {
   /** With `month` (any day in it), returns that month's expenses with recurring ones included. */
@@ -12,6 +12,12 @@ export const expenseService = {
     limit?: number;
   }): Promise<Expense[]> {
     const response = await api.get<Expense[]>('/expenses/', { params });
+    return response.data;
+  },
+
+  /** One category in each of the last 12 pay periods ending at `month` (YYYY-MM-DD). */
+  async getCategoryHistory(category: string, month: string): Promise<CategoryPeriodTotal[]> {
+    const response = await api.get<CategoryPeriodTotal[]>('/expenses/history', { params: { category, month } });
     return response.data;
   },
 

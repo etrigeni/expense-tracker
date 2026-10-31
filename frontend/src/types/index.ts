@@ -24,6 +24,7 @@ export interface Expense {
   start_date?: string | null;
   /** Recurring expenses in a month listing: ticked as paid for that month. */
   paid?: boolean | null;
+  trip_id?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -35,6 +36,7 @@ export interface ExpenseCreate {
   description?: string;
   is_recurring?: boolean;
   recurring_until?: string | null;
+  trip_id?: string | null;
 }
 
 export type ExpenseUpdate = Partial<ExpenseCreate>;
@@ -150,4 +152,28 @@ export interface PayPeriod {
   month: string;
   start: string;
   end: string;
+}
+
+export interface Trip {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  total: number;
+  expense_count: number;
+  created_at: string;
+}
+
+export interface TripCreate {
+  name: string;
+  start_date: string;
+  end_date: string;
+}
+
+/** What one category cost in a pay period. */
+export interface CategoryPeriodTotal {
+  month: string;
+  start: string;
+  end: string;
+  total: number;
 }

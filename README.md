@@ -6,9 +6,10 @@ A full-stack web application for tracking expenses and monthly bills. Built with
 
 - **User Authentication** - Secure JWT-based authentication with password hashing
 - **Expense Tracking** - Add, edit, delete, and filter expenses by category and date
-- **Category Management** - Pre-set categories with ability to create custom ones
+- **Categories** - Grouped presets (Home & bills, Everyday, Car, Health & you, Fun & life, Other), e.g. Rent, Electricity, Water, Internet, Mobile, Fuel, Gifts
 - **Overview** - What is left to spend this month, spending by category, and a 6-month trend
 - **Quick add** - Add an expense from any page, with one-tap shortcuts for your most-used categories
+- **Trips** - Create a trip with dates; expenses dated during it are added to it automatically, with a total and breakdown per trip (they still count in the pay period too)
 - **Monthly bills** - Mark an expense as repeating every month; it counts in every month until stopped, with a checklist to tick off what you've paid
 - **Responsive Design** - Works beautifully on desktop, tablet, and mobile
 - **Light and dark mode** - Follows your system setting
@@ -170,7 +171,7 @@ Frontend will be running at `http://localhost:5173`
    Periods follow the salary, paid on the last working day (Mon to Fri) of each month: a period runs from one payday to the day before the next and is named after the following month (paid Fri 30 Oct, "November" is 30 Oct to 29 Nov). Public holidays are not taken into account.
 4. **Add expense** (top right, or the + button on mobile) logs a purchase
 5. Turn on **Repeats every month** for rent, subscriptions and bills, then tick them off in **Monthly bills**
-6. **Expenses** lists the month's transactions and bills
+6. **Expenses** lists the month's transactions and bills. Pick a category (or tap one in "Where it went") to see it across the last 12 months
 
 ## API Endpoints
 
@@ -183,6 +184,7 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/expenses/` - Get all expenses (with filters); `?month=YYYY-MM-DD` returns that pay period with recurring expenses included
 - `GET /api/periods/current`, `GET /api/periods/{YYYY-MM-DD}` - Pay period dates
 - `GET /api/expenses/recurring` - Recurring expenses that still apply
+- `GET /api/expenses/history?category=&month=` - One category's total in each of the last 12 pay periods
 - `PUT /api/expenses/{id}/paid` - Tick or untick a recurring expense as paid for a month
 - `POST /api/expenses/` - Create expense
 - `GET /api/expenses/stats` - Get expense statistics
@@ -195,6 +197,11 @@ Frontend will be running at `http://localhost:5173`
 - `POST /api/categories/` - Create custom category
 - `PUT /api/categories/{id}` - Update category
 - `DELETE /api/categories/{id}` - Delete category
+
+### Trips
+- `GET /api/trips/`, `POST /api/trips/` - List (with totals) and create trips
+- `GET|PUT|DELETE /api/trips/{id}` - One trip; deleting keeps its expenses
+- `GET /api/expenses/?trip_id={id}` - A trip's expenses
 
 ### Dashboard
 - `GET /api/dashboard/overview` - Get dashboard summary
