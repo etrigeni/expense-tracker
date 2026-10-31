@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Repeat, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plane, Plus, Repeat, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { expenseService } from '@/services/expenseService';
 import { categoryService } from '@/services/categoryService';
 import { periodService } from '@/services/periodService';
-import type { Category, Expense, ExpenseCreate, PayPeriod } from '@/types';
+import { tripService } from '@/services/tripService';
+import type { Category, Expense, ExpenseCreate, PayPeriod, Trip } from '@/types';
 import {
   formatCurrency,
   formatDayHeading,
@@ -53,6 +54,7 @@ const Expenses: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState('');
   const [month, setMonth] = useState('');
   const [period, setPeriod] = useState<PayPeriod | null>(null);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -74,6 +76,10 @@ const Expenses: React.FC = () => {
       .getCategories()
       .then(setCategories)
       .catch(() => toast.error('Could not load categories.'));
+    tripService
+      .getTrips()
+      .then(setTrips)
+      .catch(() => toast.error('Could not load trips.'));
     periodService
       .getCurrent()
       .then((current) => {
@@ -98,6 +104,7 @@ const Expenses: React.FC = () => {
     if (month) loadExpenses();
   });
 
+  const tripNames = useMemo(() => new Map(trips.map((trip) => [trip.id, trip.name])), [trips]);
   const bills = useMemo(() => expenses.filter((expense) => expense.is_recurring), [expenses]);
   const totalSpent = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const billsTotal = bills.reduce((sum, bill) => sum + Number(bill.amount), 0);
@@ -288,6 +295,12 @@ const Expenses: React.FC = () => {
                           </p>
                           <p className="flex items-center gap-1.5 truncate text-xs text-ink-3">
                             {expense.description ? <span className="truncate">{expense.category}</span> : null}
+                            {expense.trip_id && tripNames.get(expense.trip_id) ? (
+                              <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-[#dde3d5] px-1.5 py-0.5 text-[11px] font-medium text-[#5d6655]">
+                                <Plane className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                <span className="truncate">{tripNames.get(expense.trip_id)}</span>
+                              </span>
+                            ) : null}
                             {expense.is_recurring ? (
                               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-accent-ink">
                                 <Repeat className="h-3 w-3" aria-label="Monthly" />
@@ -319,6 +332,7 @@ const Expenses: React.FC = () => {
         open={editing !== null}
         expense={editing}
         categories={categories}
+        trips={trips}
         onClose={() => setEditing(null)}
         onSubmit={handleSave}
       />
