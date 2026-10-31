@@ -6,7 +6,7 @@ A full-stack web application for tracking expenses and monthly bills. Built with
 
 - **User Authentication** - Secure JWT-based authentication with password hashing
 - **Expense Tracking** - Add, edit, delete, and filter expenses by category and date
-- **Category Management** - Pre-set categories with ability to create custom ones
+- **Categories** - Grouped presets (Home & bills, Everyday, Car, Health & you, Fun & life, Other), e.g. Rent, Electricity, Water, Internet, Mobile, Fuel, Gifts
 - **Overview** - What is left to spend this month, spending by category, and a 6-month trend
 - **Quick add** - Add an expense from any page, with one-tap shortcuts for your most-used categories
 - **Monthly bills** - Mark an expense as repeating every month; it counts in every month until stopped, with a checklist to tick off what you've paid
