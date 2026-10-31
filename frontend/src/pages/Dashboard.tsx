@@ -468,27 +468,29 @@ const Dashboard: React.FC = () => {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <table className="sr-only">
-                <caption>Income, spending and savings for the last 6 months</caption>
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Income</th>
-                    <th>Spent</th>
-                    <th>Put aside</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trend.map((row) => (
-                    <tr key={row.label}>
-                      <td>{row.label}</td>
-                      <td>{formatCurrency(row.income)}</td>
-                      <td>{formatCurrency(row.spent)}</td>
-                      <td>{formatCurrency(row.saved)}</td>
+              <div className="sr-only">
+              <table>
+                  <caption>Income, spending and savings for the last 6 months</caption>
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Income</th>
+                      <th>Spent</th>
+                      <th>Put aside</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {trend.map((row) => (
+                      <tr key={row.label}>
+                        <td>{row.label}</td>
+                        <td>{formatCurrency(row.income)}</td>
+                        <td>{formatCurrency(row.spent)}</td>
+                        <td>{formatCurrency(row.saved)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            </div>
             </>
           ) : (
             <EmptyState title="No history yet" description="Your monthly totals build up here over time." />
