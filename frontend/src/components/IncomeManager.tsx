@@ -195,6 +195,12 @@ const IncomeManager: React.FC<{
             Repeats
           </label>
           {form.is_recurring ? (
+            <p className="-mt-2 text-xs text-ink-3">
+              Counts every month with the same amount. Changing it later changes past months too, so for a salary
+              that varies, add it each payday instead.
+            </p>
+          ) : null}
+          {form.is_recurring ? (
             <Field label="How often">
               <Select value={form.frequency} onChange={(event) => update({ frequency: event.target.value })}>
                 <option value="monthly">Monthly</option>

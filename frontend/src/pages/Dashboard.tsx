@@ -23,6 +23,7 @@ import { CategoryIcon, categoryStyle, isRetiredCategory } from '@/utils/categori
 import { Button, EmptyState, Input, Money, Panel, PanelHeader, Spinner } from '@/components/ui';
 import { ChartTooltip, LegendItem, useChartTheme } from '@/components/charts';
 import IncomeManager from '@/components/IncomeManager';
+import PaydayPrompt, { isPaydayDismissed, needsSalary } from '@/components/PaydayPrompt';
 import BillsChecklist from '@/components/BillsChecklist';
 import { useExpensesChanged, useQuickAdd } from '@/components/QuickAdd';
 
@@ -206,6 +207,11 @@ const Dashboard: React.FC = () => {
   }
 
   const activeTrip = tripOn(trips, todayInput());
+  // The payday prompt already asks for income; the hero doesn't repeat it
+  const salaryPromptShown =
+    overview !== null &&
+    needsSalary(incomes, overview.period_start, overview.period_end) &&
+    !isPaydayDismissed(overview.period_start);
   const spent = Number(overview?.total_expenses_month ?? 0);
   const income = Number(overview?.income_total_month ?? 0);
   const balance = Number(overview?.net_balance_month ?? income - spent);
@@ -238,6 +244,18 @@ const Dashboard: React.FC = () => {
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-ink-3" />
         </Link>
+      ) : null}
+
+      {overview ? (
+        <PaydayPrompt
+          monthName={monthName}
+          periodStart={overview.period_start}
+          periodEnd={overview.period_end}
+          incomes={incomes}
+          onAdded={async () => {
+            await Promise.all([loadIncomes(), loadOverview()]);
+          }}
+        />
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
@@ -286,16 +304,20 @@ const Dashboard: React.FC = () => {
                 <p className="mt-2 text-5xl font-semibold tracking-tight sm:text-7xl">
                   <Money amount={spent} fractionClassName="text-[0.4em] font-medium text-ink-3" />
                 </p>
-                <p className="mt-6 max-w-sm text-sm text-ink-2">
-                  Add your income to see how much you have left this month.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setIncomeOpen(true)}
-                  className="mt-3 inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-medium text-accent-on"
-                >
-                  Add income
-                </button>
+                {salaryPromptShown ? null : (
+                  <>
+                    <p className="mt-6 max-w-sm text-sm text-ink-2">
+                      Add your income to see how much you have left this month.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIncomeOpen(true)}
+                      className="mt-3 inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-medium text-accent-on"
+                    >
+                      Add income
+                    </button>
+                  </>
+                )}
               </>
             )}
 
