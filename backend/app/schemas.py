@@ -6,24 +6,6 @@ from decimal import Decimal
 import uuid
 
 
-# User Schemas
-class UserBase(BaseModel):
-    email: EmailStr
-    full_name: Optional[str] = None
-
-
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=8, max_length=72)
-
-
-class UserResponse(UserBase):
-    id: uuid.UUID
-    is_active: bool
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # Token Schemas
 class Token(BaseModel):
     access_token: str
@@ -194,16 +176,6 @@ class SavingsResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
-
-
-# Password Reset Schemas
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-
-
-class PasswordResetConfirm(BaseModel):
-    token: str
-    new_password: str = Field(..., min_length=8, max_length=72)
 
 
 # Login Schema
