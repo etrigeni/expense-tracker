@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Plus, Receipt } from 'lucide-react';
+import { KeyRound, LayoutDashboard, LogOut, Plus, Receipt } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { QuickAddProvider, useQuickAdd } from './QuickAdd';
+import ChangePasswordDialog from './ChangePasswordDialog';
 
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
@@ -50,6 +51,7 @@ const FloatingAddButton: React.FC = () => {
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -81,6 +83,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <HeaderAddButton />
               <button
                 type="button"
+                onClick={() => setPasswordOpen(true)}
+                aria-label="Change password"
+                title="Change password"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-sunken hover:text-ink"
+              >
+                <KeyRound className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={handleLogout}
                 aria-label="Log out"
                 title="Log out"
@@ -91,6 +102,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
           </div>
         </header>
+
+        <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
 
         <FloatingAddButton />
 
