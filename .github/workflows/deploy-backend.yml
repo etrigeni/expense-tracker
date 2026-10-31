@@ -1,0 +1,24 @@
+# Render's auto-deploy can't see this repo (it's linked to another GitHub account),
+# so this triggers the backend deploy through the service's deploy hook instead.
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "::error::Add the RENDER_DEPLOY_HOOK secret (Render > Settings > Deploy Hook)"
+            exit 1
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK" > /dev/null
+          echo "Deploy triggered on Render"
