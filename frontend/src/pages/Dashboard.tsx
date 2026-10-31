@@ -400,7 +400,11 @@ const Dashboard: React.FC = () => {
             <div className="p-5">
               <ul className="space-y-4">
                 {categories.map((item) => (
-                  <li key={item.category} className="flex items-center gap-3">
+                  <li key={item.category}>
+                    <Link
+                      to={`/expenses?category=${encodeURIComponent(item.category)}`}
+                      className="-mx-2 flex items-center gap-3 rounded-control px-2 py-1 transition-colors hover:bg-white/50"
+                    >
                     <CategoryIcon name={item.category} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3 text-sm">
@@ -419,6 +423,7 @@ const Dashboard: React.FC = () => {
                         />
                       </div>
                     </div>
+                    </Link>
                   </li>
                 ))}
               </ul>

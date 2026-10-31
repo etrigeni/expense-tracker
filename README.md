@@ -171,7 +171,7 @@ Frontend will be running at `http://localhost:5173`
    Periods follow the salary, paid on the last working day (Mon to Fri) of each month: a period runs from one payday to the day before the next and is named after the following month (paid Fri 30 Oct, "November" is 30 Oct to 29 Nov). Public holidays are not taken into account.
 4. **Add expense** (top right, or the + button on mobile) logs a purchase
 5. Turn on **Repeats every month** for rent, subscriptions and bills, then tick them off in **Monthly bills**
-6. **Expenses** lists the month's transactions and bills
+6. **Expenses** lists the month's transactions and bills. Pick a category (or tap one in "Where it went") to see it across the last 12 months
 
 ## API Endpoints
 
@@ -184,6 +184,7 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/expenses/` - Get all expenses (with filters); `?month=YYYY-MM-DD` returns that pay period with recurring expenses included
 - `GET /api/periods/current`, `GET /api/periods/{YYYY-MM-DD}` - Pay period dates
 - `GET /api/expenses/recurring` - Recurring expenses that still apply
+- `GET /api/expenses/history?category=&month=` - One category's total in each of the last 12 pay periods
 - `PUT /api/expenses/{id}/paid` - Tick or untick a recurring expense as paid for a month
 - `POST /api/expenses/` - Create expense
 - `GET /api/expenses/stats` - Get expense statistics

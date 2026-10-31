@@ -86,6 +86,13 @@ class TripResponse(TripBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CategoryPeriodTotal(BaseModel):
+    month: DateType  # pay period label, first day
+    start: DateType
+    end: DateType
+    total: Decimal
+
+
 class RecurringPaymentUpdate(BaseModel):
     month: DateType
     paid: bool
