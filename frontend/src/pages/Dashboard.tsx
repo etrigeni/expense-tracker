@@ -9,10 +9,10 @@ import { savingsService } from '@/services/savingsService';
 import { expenseService } from '@/services/expenseService';
 import type { DashboardOverview, Expense, Income } from '@/types';
 import {
-  currentMonthKey,
   formatCurrency,
   formatDate,
   formatMonthLabel,
+  formatPeriodRange,
   monthKeyToDate,
   shiftMonthKey,
 } from '@/utils/format';
@@ -58,8 +58,9 @@ const Dashboard: React.FC = () => {
   const chart = useChartTheme();
   const openQuickAdd = useQuickAdd();
 
-  const month = currentMonthKey();
-  const monthName = formatMonthLabel(month).split(' ')[0];
+  // The current pay period's label month (YYYY-MM), known once the overview has loaded
+  const month = overview?.period_month.slice(0, 7) ?? '';
+  const monthName = month ? formatMonthLabel(month).split(' ')[0] : '';
 
   const loadOverview = async () => {
     try {
@@ -112,9 +113,13 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     loadOverview();
     loadIncomes();
+  }, []);
+
+  useEffect(() => {
+    if (!month) return;
     loadSavings();
     loadBills();
-  }, []);
+  }, [month]);
 
   useExpensesChanged(() => {
     loadOverview();
@@ -145,6 +150,7 @@ const Dashboard: React.FC = () => {
   };
 
   const trend = useMemo(() => {
+    if (!month) return [];
     const totals = (entries: { month: string; total: number }[] = []) => {
       const byMonth = new Map<string, number>();
       entries.forEach((entry) => {
@@ -196,7 +202,8 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       <p className="text-sm text-ink-3">
-        {greeting()}. Here is {monthName} so far.
+        {greeting()}. Here is {monthName} so far
+        {overview ? ` (${formatPeriodRange(overview.period_start, overview.period_end)})` : ''}.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
@@ -301,7 +308,7 @@ const Dashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIncomeOpen(true)}
-                className="text-sm font-medium text-accent-ink hover:underline"
+                className="-m-2 p-2 text-sm font-medium text-accent-ink hover:underline"
               >
                 Manage
               </button>
@@ -392,7 +399,7 @@ const Dashboard: React.FC = () => {
           <PanelHeader
             title="Latest expenses"
             action={
-              <Link to="/expenses" className="text-sm font-medium text-accent-ink hover:underline">
+              <Link to="/expenses" className="-m-2 p-2 text-sm font-medium text-accent-ink hover:underline">
                 See all
               </Link>
             }

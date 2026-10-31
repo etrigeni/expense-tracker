@@ -150,6 +150,10 @@ class MonthlyAmount(BaseModel):
 
 
 class DashboardOverview(BaseModel):
+    # The current pay period; the *_month figures below are for this period
+    period_month: DateType
+    period_start: DateType
+    period_end: DateType
     total_expenses_month: Decimal
     income_total_month: Decimal
     net_balance_month: Decimal

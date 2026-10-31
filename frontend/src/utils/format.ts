@@ -40,9 +40,6 @@ export const formatDateInput = (date: Date): string => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-/** Local-time "YYYY-MM" for the current month (toISOString would use UTC). */
-export const currentMonthKey = (): string => formatDateInput(new Date()).slice(0, 7);
-
 export const todayInput = (): string => formatDateInput(new Date());
 
 export const shiftMonthKey = (month: string, delta: number): string => {
@@ -58,4 +55,10 @@ export const formatMonthLabel = (month: string, style: 'long' | 'short' = 'long'
     month: style,
     year: style === 'long' ? 'numeric' : '2-digit',
   });
+};
+
+/** "30 Oct to 29 Nov" */
+export const formatPeriodRange = (start: string, end: string): string => {
+  const short = (value: string) => new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `${short(start)} to ${short(end)}`;
 };

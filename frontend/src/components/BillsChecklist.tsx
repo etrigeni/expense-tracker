@@ -68,26 +68,34 @@ const BillsChecklist: React.FC<{
             const name = bill.description || bill.category;
             const day = Number(bill.date.slice(8, 10));
             return (
-              <li key={bill.id} className="group flex items-center gap-3 rounded-control px-3 py-2.5">
+              <li key={`${bill.id}-${bill.date}`} className="group flex items-center gap-3 rounded-control px-3 py-2.5">
                 <button
                   type="button"
                   role="checkbox"
                   aria-checked={Boolean(bill.paid)}
                   aria-label={`${name} paid for ${monthName}`}
                   onClick={() => onTogglePaid(bill, !bill.paid)}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                    bill.paid ? 'border-accent bg-accent text-accent-on' : 'border-ink-3/40 bg-white hover:border-accent'
-                  }`}
+                  className="group/check -m-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                 >
-                  {bill.paid ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-colors ${
+                      bill.paid
+                        ? 'border-accent bg-accent text-accent-on'
+                        : 'border-ink-3/40 bg-white group-hover/check:border-accent'
+                    }`}
+                  >
+                    {bill.paid ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
+                  </span>
                 </button>
-                <CategoryIcon name={bill.category} size="sm" />
+                <span className="hidden sm:flex">
+                  <CategoryIcon name={bill.category} size="sm" />
+                </span>
                 <div className={`min-w-0 flex-1 ${bill.paid ? 'opacity-60' : ''}`}>
                   <p className={`truncate text-sm font-medium text-ink ${bill.paid ? 'line-through decoration-ink-3/60' : ''}`}>
                     {name}
                   </p>
                   <p className="truncate text-xs text-ink-3">
-                    {bill.paid ? 'Paid' : `Due on the ${ordinal(day)}`}
+                    {bill.paid ? 'Paid' : `Due ${ordinal(day)}`}
                   </p>
                 </div>
                 <Money amount={Number(bill.amount)} className={`text-sm font-medium text-ink ${bill.paid ? 'opacity-60' : ''}`} />

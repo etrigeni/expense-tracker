@@ -114,6 +114,10 @@ export interface IncomeTotal {
 }
 
 export interface DashboardOverview {
+  /** Current pay period: label month (first day) and its first and last day */
+  period_month: string;
+  period_start: string;
+  period_end: string;
   total_expenses_month: number;
   income_total_month: number;
   net_balance_month: number;
@@ -138,4 +142,12 @@ export interface Savings {
 export interface SavingsUpsert {
   month: string;
   amount: number | null;
+}
+
+/** A pay period: from the last working day of one month to the day before the next payday,
+ * named after the month that follows the payday. */
+export interface PayPeriod {
+  month: string;
+  start: string;
+  end: string;
 }

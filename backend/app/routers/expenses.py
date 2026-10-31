@@ -9,7 +9,8 @@ from app.database import get_db
 from app.models import User, Expense, RecurringPayment
 from app.schemas import ExpenseCreate, ExpenseResponse, ExpenseStats, ExpenseUpdate, RecurringPaymentUpdate
 from app.dependencies import get_current_user
-from app.recurring import month_end, month_start, occurrences_in_month
+from app.periods import period_bounds, period_for
+from app.recurring import occurrences_in_period
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
@@ -24,7 +25,9 @@ def as_occurrence(expense: Expense, on: date, paid_ids: set[uuid.UUID]) -> Expen
 
 @router.get("/", response_model=list[ExpenseResponse])
 async def get_expenses(
-    month: Optional[date] = Query(None, description="Any day in the month; returns that month with recurring expenses included"),
+    month: Optional[date] = Query(
+        None, description="Pay period label (any day in the month it is named after); recurring expenses included"
+    ),
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     category: Optional[str] = None,
@@ -33,13 +36,14 @@ async def get_expenses(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get user expenses. With `month`, returns every expense that counts in that month, recurring ones included."""
+    """Get user expenses. With `month`, returns every expense in that pay period, recurring ones included."""
     query = select(Expense).where(Expense.user_id == current_user.id)
     if category:
         query = query.where(Expense.category == category)
 
     if month:
-        start, end = month_start(month), month_end(month)
+        label = month.replace(day=1)
+        start, end = period_bounds(label)
         query = query.where(
             or_(
                 and_(Expense.date >= start, Expense.date <= end),
@@ -55,13 +59,15 @@ async def get_expenses(
         paid = await db.execute(
             select(RecurringPayment.expense_id).where(
                 and_(
-                    RecurringPayment.month == start,
+                    RecurringPayment.month == label,
                     RecurringPayment.expense_id.in_([expense.id for expense in expenses if expense.is_recurring]),
                 )
             )
         )
         paid_ids = set(paid.scalars().all())
-        occurrences = [as_occurrence(expense, on, paid_ids) for expense, on in occurrences_in_month(expenses, start)]
+        occurrences = [
+            as_occurrence(expense, on, paid_ids) for expense, on in occurrences_in_period(expenses, start, end)
+        ]
         return sorted(occurrences, key=lambda item: item.date, reverse=True)
 
     if date_from:
@@ -79,8 +85,8 @@ async def get_recurring_expenses(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Recurring expenses that still apply this month or later."""
-    start = month_start(date.today())
+    """Recurring expenses that still apply in the current pay period or later."""
+    start, _ = period_bounds(period_for(date.today()))
     result = await db.execute(
         select(Expense)
         .where(
@@ -163,7 +169,7 @@ async def set_recurring_paid(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Tick or untick a recurring expense as paid for one month."""
+    """Tick or untick a recurring expense as paid for one pay period (`month` is its label)."""
     result = await db.execute(
         select(Expense).where(and_(Expense.id == expense_id, Expense.user_id == current_user.id))
     )
@@ -171,7 +177,7 @@ async def set_recurring_paid(
     if expense is None or not expense.is_recurring:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurring expense not found")
 
-    month = month_start(payment.month)
+    month = payment.month.replace(day=1)
     result = await db.execute(
         select(RecurringPayment).where(
             and_(RecurringPayment.expense_id == expense.id, RecurringPayment.month == month)

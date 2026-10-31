@@ -1,23 +1,20 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, extract
+from sqlalchemy import select, and_, or_
 from decimal import Decimal
-from datetime import date, datetime, timedelta
+from datetime import date
 from app.database import get_db
 from app.models import User, Expense, Income, Savings
-from app.schemas import DashboardOverview, CategorySummary, ExpenseResponse, MonthlyCategorySpend, MonthlyAmount
+from app.schemas import DashboardOverview, CategorySummary, MonthlyCategorySpend, MonthlyAmount
 from app.dependencies import get_current_user
 from app.utils import calculate_percentage
-from app import recurring
+from app.periods import period_bounds, period_for, shift_month
+from app.recurring import occurrences_in_period
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-
-def shift_month(date_value: date, delta: int) -> date:
-    """Shift date by delta months, normalized to the first day of the month."""
-    year = date_value.year + (date_value.month - 1 + delta) // 12
-    month = (date_value.month - 1 + delta) % 12 + 1
-    return date(year, month, 1)
+TREND_PERIODS = 6
+ZERO = Decimal("0.00")
 
 
 def calculate_mom(current: Decimal, previous: Decimal) -> float | None:
@@ -31,12 +28,11 @@ async def get_dashboard_overview(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get dashboard summary"""
-    today = date.today()
-    current_month_start = today.replace(day=1)
-    trend_start = shift_month(current_month_start, -5)
-    previous_month_start = shift_month(current_month_start, -1)
-    previous_month_end = current_month_start - timedelta(days=1)
+    """Summary of the current pay period, with the previous one and a trend of the last six."""
+    current = period_for(date.today())
+    labels = [shift_month(current, offset) for offset in range(-(TREND_PERIODS - 1), 1)]
+    bounds = {label: period_bounds(label) for label in labels}
+    window_start, window_end = bounds[labels[0]][0], bounds[current][1]
 
     # Every expense that can count in the trend window: one-offs dated inside it, plus
     # recurring expenses that started before its end and had not stopped before its start.
@@ -44,140 +40,102 @@ async def get_dashboard_overview(
         select(Expense).where(
             and_(
                 Expense.user_id == current_user.id,
+                Expense.date <= window_end,
                 or_(
-                    Expense.date >= trend_start,
+                    Expense.date >= window_start,
                     and_(
                         Expense.is_recurring.is_(True),
-                        or_(Expense.recurring_until.is_(None), Expense.recurring_until >= trend_start),
+                        or_(Expense.recurring_until.is_(None), Expense.recurring_until >= window_start),
                     ),
                 ),
-                Expense.date <= recurring.month_end(today),
             )
         )
     )
     window_expenses = result.scalars().all()
 
-    def expenses_in(month: date) -> list[Expense]:
-        return [expense for expense, _ in recurring.occurrences_in_month(window_expenses, month)]
+    def expenses_in(label: date) -> list[Expense]:
+        return [expense for expense, _ in occurrences_in_period(window_expenses, *bounds[label])]
 
-    monthly_expenses = expenses_in(current_month_start)
-    total_expenses_month = sum((expense.amount for expense in monthly_expenses), Decimal("0.00"))
-    total_expenses_previous = sum((expense.amount for expense in expenses_in(previous_month_start)), Decimal("0.00"))
+    # Income: entries dated in the period, plus recurring income in every period from its start
+    result = await db.execute(
+        select(Income).where(
+            and_(
+                Income.user_id == current_user.id,
+                Income.date <= window_end,
+                or_(Income.date >= window_start, Income.is_recurring.is_(True)),
+            )
+        )
+    )
+    window_incomes = result.scalars().all()
+
+    def income_in(label: date) -> Decimal:
+        start, end = bounds[label]
+        return sum(
+            (
+                income.amount
+                for income in window_incomes
+                if (start <= income.date <= end) or (income.is_recurring and income.date <= end)
+            ),
+            ZERO,
+        )
+
+    current_expenses = expenses_in(current)
+    total_expenses = sum((expense.amount for expense in current_expenses), ZERO)
+    previous = labels[-2]
+    total_expenses_previous = sum((expense.amount for expense in expenses_in(previous)), ZERO)
+    income_total = income_in(current)
 
     category_totals: dict[str, Decimal] = {}
-    for expense in monthly_expenses:
-        category_totals[expense.category] = category_totals.get(expense.category, Decimal("0.00")) + expense.amount
+    for expense in current_expenses:
+        category_totals[expense.category] = category_totals.get(expense.category, ZERO) + expense.amount
+    expenses_by_category = sorted(
+        (
+            CategorySummary(category=category, total=total, percentage=calculate_percentage(total, total_expenses))
+            for category, total in category_totals.items()
+        ),
+        key=lambda item: item.total,
+        reverse=True,
+    )
 
-    expenses_by_category = [
-        CategorySummary(category=category, total=total, percentage=calculate_percentage(total, total_expenses_month))
-        for category, total in category_totals.items()
-    ]
-    expenses_by_category.sort(key=lambda x: x.total, reverse=True)
+    monthly_category_spend = []
+    for label in labels:
+        totals: dict[str, Decimal] = {}
+        for expense in expenses_in(label):
+            totals[expense.category] = totals.get(expense.category, ZERO) + expense.amount
+        monthly_category_spend.extend(
+            MonthlyCategorySpend(month=label, category=category, total=total)
+            for category, total in sorted(totals.items())
+        )
 
-    # Get recent transactions (last 10)
+    monthly_income = [MonthlyAmount(month=label, total=income_in(label)) for label in labels]
+
+    # Savings are stored per period label
     result = await db.execute(
-        select(Expense)
-        .where(Expense.user_id == current_user.id)
-        .order_by(Expense.date.desc())
-        .limit(10)
+        select(Savings).where(
+            and_(Savings.user_id == current_user.id, Savings.month >= labels[0], Savings.month <= current)
+        )
+    )
+    monthly_savings = [
+        MonthlyAmount(month=saving.month.replace(day=1), total=saving.amount)
+        for saving in result.scalars().all()
+        if saving.amount is not None
+    ]
+
+    result = await db.execute(
+        select(Expense).where(Expense.user_id == current_user.id).order_by(Expense.date.desc()).limit(10)
     )
     recent_transactions = result.scalars().all()
 
-    # Get income total for the month (including recurring)
-    month_start = current_month_start
-    result = await db.execute(
-        select(func.sum(Income.amount)).where(
-            and_(
-                Income.user_id == current_user.id,
-                or_(
-                    and_(Income.date >= month_start, Income.date <= today),
-                    and_(Income.is_recurring == True, Income.date <= today),
-                ),
-            )
-        )
-    )
-    income_total_month = result.scalar_one() or Decimal("0.00")
-
-    # Get income total for previous month (including recurring)
-    result = await db.execute(
-        select(func.sum(Income.amount)).where(
-            and_(
-                Income.user_id == current_user.id,
-                or_(
-                    and_(Income.date >= previous_month_start, Income.date <= previous_month_end),
-                    and_(Income.is_recurring == True, Income.date <= previous_month_end),
-                ),
-            )
-        )
-    )
-    income_total_previous = result.scalar_one() or Decimal("0.00")
-
-    # Monthly category spend (last 6 months including current), recurring expenses in every month they apply
-    monthly_category_spend = []
-    for offset in range(-5, 1):
-        month = shift_month(current_month_start, offset)
-        totals: dict[str, Decimal] = {}
-        for expense in expenses_in(month):
-            totals[expense.category] = totals.get(expense.category, Decimal("0.00")) + expense.amount
-        monthly_category_spend.extend(
-            MonthlyCategorySpend(month=month, category=category, total=total) for category, total in sorted(totals.items())
-        )
-
-    # Monthly income totals (last 6 months)
-    result = await db.execute(
-        select(
-            extract("year", Income.date).label("year"),
-            extract("month", Income.date).label("month"),
-            func.sum(Income.amount).label("total"),
-        )
-        .where(
-            and_(
-                Income.user_id == current_user.id,
-                Income.date >= trend_start,
-            )
-        )
-        .group_by("year", "month")
-        .order_by("year", "month")
-    )
-    monthly_income = [
-        MonthlyAmount(
-            month=date(int(row.year), int(row.month), 1),
-            total=row.total,
-        )
-        for row in result
-    ]
-
-    # Monthly savings totals (last 6 months)
-    result = await db.execute(
-        select(
-            extract("year", Savings.month).label("year"),
-            extract("month", Savings.month).label("month"),
-            func.sum(Savings.amount).label("total"),
-        )
-        .where(
-            and_(
-                Savings.user_id == current_user.id,
-                Savings.month >= trend_start,
-            )
-        )
-        .group_by("year", "month")
-        .order_by("year", "month")
-    )
-    monthly_savings = [
-        MonthlyAmount(
-            month=date(int(row.year), int(row.month), 1),
-            total=row.total,
-        )
-        for row in result
-        if row.total is not None
-    ]
-
+    period_start, period_end = bounds[current]
     return DashboardOverview(
-        total_expenses_month=total_expenses_month,
-        income_total_month=income_total_month,
-        net_balance_month=income_total_month - total_expenses_month,
-        expenses_mom_percentage=calculate_mom(total_expenses_month, total_expenses_previous),
-        income_mom_percentage=calculate_mom(income_total_month, income_total_previous),
+        period_month=current,
+        period_start=period_start,
+        period_end=period_end,
+        total_expenses_month=total_expenses,
+        income_total_month=income_total,
+        net_balance_month=income_total - total_expenses,
+        expenses_mom_percentage=calculate_mom(total_expenses, total_expenses_previous),
+        income_mom_percentage=calculate_mom(income_total, income_in(previous)),
         expenses_by_category=expenses_by_category,
         monthly_category_spend=monthly_category_spend,
         monthly_income=monthly_income,
