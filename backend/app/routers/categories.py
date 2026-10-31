@@ -9,22 +9,32 @@ from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
-# Default categories
+# Shared categories offered to every user. The app groups them for the picker; Bills,
+# Activities and Savings stay so older expenses keep their category, but are not offered.
 DEFAULT_CATEGORIES = [
-    {"name": "Food", "icon": "????", "color": "text-orange-500"},
-    {"name": "Transport", "icon": "????", "color": "text-blue-500"},
-    {"name": "Shopping", "icon": "???????", "color": "text-pink-500"},
-    {"name": "Bills", "icon": "????", "color": "text-yellow-500"},
-    {"name": "Entertainment", "icon": "????", "color": "text-purple-500"},
-    {"name": "Health", "icon": "??????", "color": "text-red-500"},
-    {"name": "Education", "icon": "????", "color": "text-green-500"},
-    {"name": "Savings", "icon": "????", "color": "text-emerald-600"},
-    {"name": "Travel", "icon": "????", "color": "text-sky-500"},
-    {"name": "Gym", "icon": "????", "color": "text-indigo-500"},
-    {"name": "Activities", "icon": "????", "color": "text-green-500"},
-    {"name": "Car", "icon": "????", "color": "text-blue-500"},
-    {"name": "Supermarket", "icon": "??????", "color": "text-amber-500"},
-    {"name": "Other", "icon": "???", "color": "text-gray-500"},
+    {"name": "Rent", "icon": "home", "color": "oat"},
+    {"name": "Electricity", "icon": "zap", "color": "oat"},
+    {"name": "Water", "icon": "droplets", "color": "sage"},
+    {"name": "Internet", "icon": "wifi", "color": "mauve"},
+    {"name": "Mobile", "icon": "smartphone", "color": "blush"},
+    {"name": "Supermarket", "icon": "basket", "color": "oat"},
+    {"name": "Food & coffee", "icon": "coffee", "color": "blush"},
+    {"name": "Transport", "icon": "tram", "color": "sage"},
+    {"name": "Fuel", "icon": "fuel", "color": "oat"},
+    {"name": "Car", "icon": "car", "color": "sage"},
+    {"name": "Health", "icon": "heart", "color": "mauve"},
+    {"name": "Gym", "icon": "dumbbell", "color": "sage"},
+    {"name": "Beauty", "icon": "brush", "color": "blush"},
+    {"name": "Entertainment", "icon": "sparkles", "color": "mauve"},
+    {"name": "Subscriptions", "icon": "card", "color": "mauve"},
+    {"name": "Shopping", "icon": "bag", "color": "blush"},
+    {"name": "Gifts", "icon": "gift", "color": "blush"},
+    {"name": "Travel", "icon": "plane", "color": "sage"},
+    {"name": "Education", "icon": "cap", "color": "oat"},
+    {"name": "Other", "icon": "shapes", "color": "oat"},
+    {"name": "Bills", "icon": "receipt", "color": "oat"},
+    {"name": "Activities", "icon": "ticket", "color": "blush"},
+    {"name": "Savings", "icon": "piggy", "color": "sage"},
 ]
 
 

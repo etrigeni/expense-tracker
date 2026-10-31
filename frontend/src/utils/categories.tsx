@@ -3,7 +3,10 @@ import {
   Car,
   Coffee,
   CreditCard,
+  Droplets,
   Dumbbell,
+  Fuel,
+  Gift,
   GraduationCap,
   HeartPulse,
   Home,
@@ -13,12 +16,15 @@ import {
   Shapes,
   ShoppingBag,
   ShoppingBasket,
+  Smartphone,
   Sparkles,
   Ticket,
   TramFront,
-  Truck,
+  Wifi,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
+import type { Category } from '@/types';
 
 // Four pale tints so categories are told apart gently; the icon and name carry identity.
 const tones = {
@@ -31,25 +37,63 @@ const tones = {
 type Tone = keyof typeof tones;
 
 const categories: Record<string, { icon: LucideIcon; tone: Tone }> = {
-  Bills: { icon: Receipt, tone: 'oat' },
-  'Food/Coffee': { icon: Coffee, tone: 'blush' },
-  Food: { icon: Coffee, tone: 'blush' },
-  Delivery: { icon: Truck, tone: 'blush' },
+  Rent: { icon: Home, tone: 'oat' },
+  Electricity: { icon: Zap, tone: 'oat' },
+  Water: { icon: Droplets, tone: 'sage' },
+  Internet: { icon: Wifi, tone: 'mauve' },
+  Mobile: { icon: Smartphone, tone: 'blush' },
+  Supermarket: { icon: ShoppingBasket, tone: 'oat' },
+  'Food & coffee': { icon: Coffee, tone: 'blush' },
   Transport: { icon: TramFront, tone: 'sage' },
-  'House rent': { icon: Home, tone: 'oat' },
+  Fuel: { icon: Fuel, tone: 'oat' },
   Car: { icon: Car, tone: 'sage' },
   Health: { icon: HeartPulse, tone: 'mauve' },
-  Shopping: { icon: ShoppingBag, tone: 'blush' },
-  Aesthetics: { icon: Brush, tone: 'mauve' },
   Gym: { icon: Dumbbell, tone: 'sage' },
-  Subscriptions: { icon: CreditCard, tone: 'mauve' },
-  Supermarket: { icon: ShoppingBasket, tone: 'oat' },
+  Beauty: { icon: Brush, tone: 'blush' },
   Entertainment: { icon: Sparkles, tone: 'mauve' },
-  Savings: { icon: PiggyBank, tone: 'sage' },
+  Subscriptions: { icon: CreditCard, tone: 'mauve' },
+  Shopping: { icon: ShoppingBag, tone: 'blush' },
+  Gifts: { icon: Gift, tone: 'blush' },
   Travel: { icon: Plane, tone: 'sage' },
-  Activities: { icon: Ticket, tone: 'blush' },
   Education: { icon: GraduationCap, tone: 'oat' },
   Other: { icon: Shapes, tone: 'oat' },
+  // Kept for older expenses; not offered for new ones
+  Bills: { icon: Receipt, tone: 'oat' },
+  Activities: { icon: Ticket, tone: 'blush' },
+  Savings: { icon: PiggyBank, tone: 'sage' },
+};
+
+/** How the category picker is laid out. Categories not listed here (custom ones) go under Other. */
+export const categoryGroups: { title: string; names: string[] }[] = [
+  { title: 'Home & bills', names: ['Rent', 'Electricity', 'Water', 'Internet', 'Mobile'] },
+  { title: 'Everyday', names: ['Supermarket', 'Food & coffee', 'Transport'] },
+  { title: 'Car', names: ['Fuel', 'Car'] },
+  { title: 'Health & you', names: ['Health', 'Gym', 'Beauty'] },
+  { title: 'Fun & life', names: ['Entertainment', 'Subscriptions', 'Shopping', 'Gifts', 'Travel'] },
+  { title: 'Other', names: ['Education', 'Other'] },
+];
+
+const retiredCategories = new Set(['Bills', 'Activities', 'Savings']);
+
+/**
+ * Categories to offer in the picker, grouped. Retired ones are left out unless `keep`
+ * names one (the category of the expense being edited).
+ */
+export const groupCategories = (all: Category[], keep?: string) => {
+  const byName = new Map(all.map((category) => [category.name, category]));
+  const grouped = new Set(categoryGroups.flatMap((group) => group.names));
+  const extras = all.filter(
+    (category) => !grouped.has(category.name) && (!retiredCategories.has(category.name) || category.name === keep)
+  );
+  return categoryGroups
+    .map((group) => ({
+      title: group.title,
+      categories: [
+        ...group.names.flatMap((name) => byName.get(name) ?? []),
+        ...(group.title === 'Other' ? extras : []),
+      ],
+    }))
+    .filter((group) => group.categories.length > 0);
 };
 
 const fallbackTones: Tone[] = ['blush', 'oat', 'sage', 'mauve'];
