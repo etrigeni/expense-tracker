@@ -32,7 +32,7 @@ export const IconButton: React.FC<
     type="button"
     aria-label={label}
     title={label}
-    className={`inline-flex h-8 w-8 items-center justify-center rounded-control text-ink-3 transition-colors hover:bg-sunken ${
+    className={`inline-flex h-10 w-10 items-center justify-center rounded-control text-ink-3 sm:h-8 sm:w-8 transition-colors hover:bg-sunken ${
       tone === 'danger' ? 'hover:text-danger' : 'hover:text-ink'
     } ${className}`}
     {...props}

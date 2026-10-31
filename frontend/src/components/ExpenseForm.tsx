@@ -128,7 +128,7 @@ const ExpenseForm: React.FC<{
                   <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${chip}`} aria-hidden="true">
                     <Icon className="h-4 w-4" />
                   </span>
-                  <span className="w-full truncate text-center">{category.name}</span>
+                  <span className="line-clamp-2 w-full break-words text-center leading-tight">{category.name}</span>
                 </button>
               );
             })}
@@ -145,7 +145,7 @@ const ExpenseForm: React.FC<{
           </Field>
           <div className="space-y-1.5">
             <span className="block text-sm font-medium text-ink-2">{form.is_recurring ? 'First month' : 'Date'}</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {dayChips.map(([value, label]) => (
                 <button
                   key={label}
@@ -164,7 +164,7 @@ const ExpenseForm: React.FC<{
                 value={form.date}
                 max={today}
                 onChange={(event) => update({ date: event.target.value })}
-                className="min-w-0"
+                className="min-w-[9rem] flex-1"
               />
             </div>
           </div>
